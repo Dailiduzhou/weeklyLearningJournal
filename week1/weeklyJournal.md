@@ -14,3 +14,5 @@ Markdown Preview Enhanced和Markdown All in One真的太方便了。
 ## 了解了Go数据结构知识
 
 匿名成员变量、interface{}和闭包函数太好用了。只不过要我看代码了解实现有些难度。
+
+flag 包未免有点太难懂了。
