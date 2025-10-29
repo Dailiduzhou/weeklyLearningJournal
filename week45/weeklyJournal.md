@@ -3,8 +3,12 @@
 ## 在VS Code配置了Git仓库
 ![image1](../week45/image/image1.png)
 
+通过**SSH**连接了Github仓库，公钥配置和passphrase好悬没给我干碎。
+
 ## 在VS Code安装了Markdown相关扩展
 ![image2](../week45/image/image2.png)
+
+Markdown Preview Enhanced和Markdown All in One真的太方便了。
 
 ## 了解了Go数据结构知识
 
