@@ -4,6 +4,7 @@
 ![image1](../week45/image/image1.png)
 
 通过**SSH**连接了Github仓库，公钥配置和passphrase好悬没给我干碎。
+试试能不能用私钥在VS Code上传。
 
 ## 在VS Code安装了Markdown相关扩展
 ![image2](../week45/image/image2.png)
