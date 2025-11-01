@@ -178,5 +178,39 @@ $\fbox{replace( example.com/example/package\quad=> \quad./example/package)}$
 #### 遇到的困难
 没有接触到实际的开发项目，不太能明白module依赖管理的不同方式和必要性。
 
+## `Test` and `Benchmark`
+
+用于测试函数可行性和性能测试。
+测试的函数需要以`Test` or `Benchmark`打头。
+测试文件有后缀`_test`。
+可以传入参数`-cover`, `-bench=.`,etc.
+
+另外我就阿巴阿巴，根本看不懂。
+
+<br></br>
+$\fbox{test Template}$
+``` go
+// the way to go
+func verify(t *testing.T, testnum int, testcase, input, output, expected string) {
+    if input != output {
+        t.Errorf(“%d. %s with input = %s: output %s != %s”, testnum, testcase, input, output, expected)
+    } 
+}
+```
+---
+``` go 
+// the way to go
+func TestFunction(t *testing.T) {
+    for i, tt := range tests {
+        s := FuncToBeTested(tt.in)
+        verify(t, i, “FuncToBeTested: “, tt.in, s, tt.out)
+    }
+} 
+```
+
+| 性能测试场景 | 本地 | HTTP|
+| -- | -- | -- |
+|package | runtime/pprof | http/pprof |
+
 
 [^1]:[ .flag包](https://pkg.go.dev/flag)
