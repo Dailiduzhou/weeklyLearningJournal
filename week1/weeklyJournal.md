@@ -149,6 +149,34 @@ flowchart TD
 | `-f` 或 `--force` | 强制操作 |
 | `-v` 或 `--verbose` | 显示详细信息 |
 
+## `gowork`, `gomod`, `gopath` and `goroot`
+> `GOPATH` 和 `GOROOT` 属于旧的实现
+> `gomod` 和 `gowork` 是新的Go modules依赖管理方法
+### `GOPATH`and`GOROOT`
+| 特性 | **GOPATH** | **GOROOT** |
+| --- | --- |--- |
+| **作用**           | Go工具链和标准库的安装目录。               | 用户开发和依赖管理的工作目录。 |
+| **是否需要配置**   | 一般不需要手动配置（Go >= 1.8会自动设置）。 | 用户一般需要配置，或使用默认值 `$HOME/go`。|
+| **内容**           | Go编译器、工具链、标准库源码及预编译文件。  | 用户代码、第三方包及编译生成的二进制文件。|
+| **目录结构**       | 固定，包含`bin/`、`src/`、`pkg/`。          | 灵活，包含`bin/`、`src/`、`pkg/`。 |
+| **开发者用途**     | 不直接用于开发，仅为工具链提供支持。         | 用于存放开发代码和依赖。 |
+
+### `gomod` and `gowork`
+
+| **特性** | **gomod** | **gowork**|
+| --- | --- | --- |
+| 场景 | 本地/线上开发 | 本地开发|
+| 是否需要module名 | 是 | 否 |
+
+gomod解决module互相依赖时，需要注意require的 \\indirect 库。
+gomod处理第三方库，需要用require引入。
+gowork要使用use指令，如果要用本地package路径更换url，需要用
+$\fbox{replace( example.com/example/package\quad=> \quad./example/package)}$
+更换路径。
+
 ---
+#### 遇到的困难
+没有接触到实际的开发项目，不太能明白module依赖管理的不同方式和必要性。
+
 
 [^1]:[ .flag包](https://pkg.go.dev/flag)
