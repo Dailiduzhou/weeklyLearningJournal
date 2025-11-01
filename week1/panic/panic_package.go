@@ -4,8 +4,7 @@ package main
 
 import (
 	"fmt"
-
-	"../week1/panic/parse"
+	"text/template/parse"
 )
 
 func main() {
