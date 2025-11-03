@@ -21,8 +21,6 @@ type VCard struct {
 	Remark    string
 }
 
-var content string
-
 func main() {
 	pa := &Address{"private", "Aartselaar", "Belgium"}
 	wa := &Address{"work", "Boom", "Belgium"}
