@@ -176,3 +176,9 @@ Map 是 Go 语言中的哈希表实现，扩容机制与 Slice 不同，它是�
 可以等待所有goroutine运行结束，再进行后续操作。
 ## 主线P4
 channel增加缓冲区，可以减少堵塞，并能作为存储数据的空间。
+## Happy Branching & Merging
+![终于！](../week2/image/image.png)
+
+---
+
+终于**没捅娄子**地使用branch & merge了。
