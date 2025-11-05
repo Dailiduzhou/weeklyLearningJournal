@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
+	"time"
 )
 
 type msg struct {
@@ -21,7 +22,10 @@ func main() {
 		go func(id int) {
 			defer wg.Done()
 
+			// 宝宝、宝宝，胖手套，爱睡觉
+			randomsleep := rand.Intn(1000)
 			randnum := rand.Intn(100)
+			time.Sleep(time.Duration(randomsleep) * time.Millisecond)
 			input <- msg{Rand: randnum, Id: id}
 		}(i)
 	}
