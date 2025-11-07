@@ -1,4 +1,4 @@
-// debug_v1.0.go
+// debug_v1.1.go
 /*
    在goroutine中对consumeMSG slice进行操作，
    无法保证底层切片数据安全，

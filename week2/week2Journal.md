@@ -182,3 +182,77 @@ channel增加缓冲区，可以减少堵塞，并能作为存储数据的空间�
 ---
 
 终于**没捅娄子**地使用branch & merge了。
+
+## 实践了`testing` benchmark and `flag`的用法
+在[`chaining.go`](../week2/chaining/chaining.go) and [`benchmark_channel.go`](../week2/benchmark_channel/benchmark_channel.go)中浅浅地用了一下。
+
+## 了解了fmt `Stringer` interface 的实现
+如果某个结构体实现了String()，它就实现了Stringer()接口。
+在fmt.Print()--以及相似函数中--会自动调用Stringer 的 String()格式化输出。
+例如，[conc_access.go](../week2/conc_access/conc_access.go)
+```go
+// conc_access.go
+
+/*
+go p.backend() 持续运行，监听传入chF的函数。
+通过chF实现了读写保护，减少了对底层数据的直接访问。
+
+Person实现了fmt包中 Stringer interface，
+调用fmt.Println(bs)时，
+自动调用了func (p *Person) String() string。
+*/
+package main
+
+import (
+	"fmt"
+	"strconv"
+)
+
+type Person struct {
+	Name   string
+	salary float64
+	chF    chan func()
+}
+
+func NewPerson(name string, salary float64) *Person {
+	p := &Person{name, salary, make(chan func())}
+	go p.backend()
+	return p
+}
+
+func (p *Person) backend() {
+	for f := range p.chF {
+		f()
+	}
+}
+
+// Set salary.
+func (p *Person) SetSalary(sal float64) {
+	p.chF <- func() { p.salary = sal }
+}
+
+// Retrieve salary.
+func (p *Person) Salary() float64 {
+	fChan := make(chan float64)
+	p.chF <- func() { fChan <- p.salary }
+	return <-fChan
+}
+
+func (p *Person) String() string {
+	return "Person - name is: " + p.Name + " - salary is: " + strconv.FormatFloat(p.Salary(), 'f', 2, 64)
+}
+
+func main() {
+	bs := NewPerson("Smith Bill", 2500.5)
+	fmt.Println(bs)
+	bs.SetSalary(4000.25)
+	fmt.Println("Salary changed:")
+	fmt.Println(bs)
+}
+```
+`Output`
+```
+Person - name is: Smith Bill - salary is: 2500.50
+Salary changed:
+Person - name is: Smith Bill - salary is: 4000.25
+```
