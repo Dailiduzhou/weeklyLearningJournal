@@ -63,7 +63,9 @@ func main() {
 	t5 := template.Must(template.New("tmpl5").Funcs(funcmap).Parse(tmpl5))
 	t5.Execute(os.Stdout, user)
 
-	// range
-	// with
+	// range-end
+	// with-end and {{.}}
+	// $-variables
+
 	// omits
 }
