@@ -147,3 +147,43 @@ func handleFile(url, path string) (*HttpRequest, error) {
 }
 ```
 `handleFile`不检查请求方式吗？
+
+## 论证qzh其实是**地雷妹**
+| 地雷妹          | qzh        |
+| ------------ | ---------- |
+| 精神药物overdose | sleep od   |
+| 改花刀          | 运动受伤       |
+| 自残           | 满课周二跑步     |
+| 精神不稳定        | 精神疑似**正常** |
+## `strings.FieldsFunc()`用法
+函数签名`func FieldsFunc(s string, f func(rune) bool) []string`
+示例:
+``` go
+package main
+
+import (
+	"fmt"
+	"strings"
+	"unicode"
+)
+
+func main() {
+	f := func(c rune) bool {
+		return !unicode.IsLetter(c) && !unicode.IsNumber(c)
+	}
+	fieldsstr := strings.FieldsFunc("  foo1;bar2,baz3...", f)
+	for _, v := range fieldsstr {
+		fmt.Printf("%v\n", v)
+	}
+}
+```
+`Output`
+```
+foo1
+bar2
+baz3
+```
+将`func f(c rune)`返回值为`true`的字符作为分隔符。
+## 研究`hacker-support`包
+大概看了各函数的实现，并搜索学习了各调用函数的签名、功能。
+现在对AES的一般用法不太了解，在深入学习。

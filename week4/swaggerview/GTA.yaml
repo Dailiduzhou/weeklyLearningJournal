@@ -1,0 +1,317 @@
+basePath: /api/v1
+definitions:
+  handler.Request:
+    properties:
+      content:
+        description: 目前只有 checkpoint3 需要这个请求，都放这
+        type: string
+      extra_info:
+        description: 此字段暂时不用
+        type: string
+    type: object
+  handler.Response:
+    properties:
+      code:
+        type: integer
+      data: {}
+      message:
+        type: string
+    type: object
+host: localhost
+info:
+  contact: {}
+  description: a game to study http with go
+  title: http-theft-bank
+  version: "1.0"
+paths:
+  /bank/gate:
+    put:
+      consumes:
+      - application/json
+      description: 站点3，用 put 方法传输 error code
+      parameters:
+      - description: request
+        in: body
+        name: object
+        required: true
+        schema:
+          $ref: '#/definitions/handler.Request'
+      - description: 代号名
+        in: header
+        name: code
+        required: true
+        type: string
+      - description: 通行证
+        in: header
+        name: passport
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.Response'
+      summary: user use error code to hack this gate
+      tags:
+      - bank
+  /bank/iris_recognition_gate:
+    get:
+      consumes:
+      - application/json
+      description: 站点4，获取游戏场景文本
+      parameters:
+      - description: 代号名
+        in: header
+        name: code
+        required: true
+        type: string
+      - description: 通行证
+        in: header
+        name: passport
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.Response'
+      summary: 站点4获取文本
+      tags:
+      - bank
+  /muxi/backend/computer/examination:
+    get:
+      consumes:
+      - application/json
+      description: 站点5，获取文本
+      parameters:
+      - description: 代号名
+        in: header
+        name: code
+        required: true
+        type: string
+      - description: 通行证
+        in: header
+        name: passport
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.Response'
+      summary: 站点5 获取游戏场景文本
+      tags:
+      - end
+    post:
+      consumes:
+      - application/json
+      description: 站点5，上传文件
+      parameters:
+      - description: file,这个使用表单！！！
+        in: body
+        name: file
+        required: true
+        schema:
+          type: primitive
+      - description: 代号名
+        in: header
+        name: code
+        required: true
+        type: string
+      - description: 通行证
+        in: header
+        name: passport
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.Response'
+      summary: 站点5 上传文件 ac
+      tags:
+      - end
+  /organization/code:
+    get:
+      consumes:
+      - application/json
+      description: 站点1，返回token在头部
+      parameters:
+      - description: 代号名
+        in: header
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.Response'
+      summary: send user token
+      tags:
+      - organization
+  /organization/iris_sample:
+    get:
+      consumes:
+      - application/json
+      description: 站点4，下载图片
+      parameters:
+      - description: 代号名
+        in: header
+        name: code
+        required: true
+        type: string
+      - description: 通行证
+        in: header
+        name: passport
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.Response'
+      summary: 下载图片
+      tags:
+      - organization
+    post:
+      consumes:
+      - application/json
+      description: 站点4，上传图片
+      parameters:
+      - description: file,这个是用表单上传！！！！
+        in: body
+        name: file
+        required: true
+        schema:
+          type: primitive
+      - description: 代号名
+        in: header
+        name: code
+        required: true
+        type: string
+      - description: 通行证
+        in: header
+        name: passport
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.Response'
+      summary: 站点4 上传图片
+      tags:
+      - bank
+  /organization/secret_key:
+    get:
+      consumes:
+      - application/json
+      description: 站点2，返回加密的密钥和错误代码片段，在 body
+      parameters:
+      - description: 代号名
+        in: header
+        name: code
+        required: true
+        type: string
+      - description: 通行证
+        in: header
+        name: passport
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/handler.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/handler.Response'
+      summary: send user secretKey and error function
+      tags:
+      - organization
+swagger: "2.0"
+tags:
+- description: 组织服务
+  name: organization
+- description: 银行服务
+  name: bank
+- description: 终点服务
+  name: end
