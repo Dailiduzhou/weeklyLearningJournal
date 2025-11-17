@@ -56,6 +56,9 @@ func main() {
 	r.GET("/profiles", profilesHandler)
 	r.GET("/changepassword", changePasswordHandler)
 	r.POST("/changepassword", changepasswordhandler1)
+	r.GET("/changeprofiles", changeprofileHandler)
+	r.POST("/changeprofiles", changeprofileHandler1)
+	r.GET("/userdata", viewUserdataHandler)
 
 	r.Run(":8080")
 }
@@ -94,13 +97,13 @@ func registerHandler1(c *gin.Context) {
 		Name:     name,
 	}
 
-	mutex.RLock()
+	mutex.Lock()
 	userStore[username] = newUser
-	mutex.RUnlock()
+	mutex.Unlock()
 
 	if err := saveUserstoFiles(); err != nil {
 		mutex.Lock()
-		delete(userStore, name)
+		delete(userStore, username)
 		mutex.Unlock()
 
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -134,14 +137,8 @@ func loginHandler1(c *gin.Context) {
 		return
 	}
 
-	hashedPasswordBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	err := bcrypt.CompareHashAndPassword([]byte(userStore[username].Password), []byte(password))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "处理密码时发生内部错误"})
-		return
-	}
-
-	storedpassword := userStore[username].Password
-	if string(hashedPasswordBytes) != storedpassword {
 		c.JSON(http.StatusForbidden, gin.H{
 			"error": "密码错误",
 		})
@@ -174,23 +171,14 @@ func loginHandler1(c *gin.Context) {
 func profilesHandler(c *gin.Context) {
 	tokenString := c.Query("token")
 	username := c.Query("username")
-	claims := &CustomClaims{}
-	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, fmt.Errorf("非预期的签名方法: %v", token.Header["alg"])
-		}
-		return jwtSecret, nil
-	})
-
-	if err != nil || !token.Valid {
+	if !jwtValidator(c, tokenString) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "无效或已过期的认证令牌"})
-		c.Abort()
 		return
 	}
+
 	mutex.RLock()
-	c.HTML(http.StatusAccepted, "profiles.html", gin.H{
+	c.HTML(http.StatusOK, "profiles.html", gin.H{
 		"username": userStore[username].Username,
-		"password": userStore[username].Password,
 		"name":     userStore[username].Name,
 	})
 	mutex.RUnlock()
@@ -204,28 +192,199 @@ func changePasswordHandler(c *gin.Context) {
 
 func changepasswordhandler1(c *gin.Context) {
 	username := c.PostForm("username")
+	oldpassword := c.PostForm("odlpassword")
 	password := c.PostForm("password")
 	password1 := c.PostForm("password1")
 
 	mutex.RLock()
-	_, exists := userStore[username]
+	user, exists := userStore[username]
 	mutex.RUnlock()
+
 	if !exists {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "用户不存在",
 			"msg":   "即将跳转……",
 		})
-		time.Sleep(1 * time.Second)
-
+		// 使用JavaScript实现延迟跳转 ai-asissted
+		c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+		c.Writer.Write([]byte(`
+            <script>
+                setTimeout(function() {
+                    window.location.href = "/changepassword";
+                }, 1000);
+            </script>
+            <p>用户不存在，1秒后跳转...</p>
+        `))
+		return
 	}
-	if password != password1 {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "两次密码不一致",
+
+	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldpassword))
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "原密码错误",
 		})
-		time.Sleep(1 * time.Second)
-		c.Redirect(http.StatusOK, "http://localhost:8080/changepassword")
+
+		c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+		c.Writer.Write([]byte(`
+            <script>
+                setTimeout(function() {
+                    window.location.href = "/changepassword";
+                }, 1000);
+            </script>
+            <p>用户不存在，1秒后跳转...</p>
+        `))
+		return
 	}
 
+	if password != password1 {
+		c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+		c.Writer.Write([]byte(`
+            <script>
+                alert("两次密码不一致");
+                setTimeout(function() {
+                    window.location.href = "/changepassword";
+                }, 1000);
+            </script>
+            <p>密码不一致，1秒后跳转...</p>
+        `))
+		return
+	}
+
+	hashedPasswordBytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "处理密码时发生内部错误"})
+		return
+	}
+
+	mutex.Lock()
+	userStore[username].Password = string(hashedPasswordBytes)
+	mutex.Unlock()
+
+	if err := saveUserstoFiles(); err != nil {
+		mutex.Lock()
+		delete(userStore, username)
+		mutex.Unlock()
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "保存用户数据失败",
+		})
+	}
+
+	c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
+	c.Writer.Write([]byte(`
+        <script>
+            alert("密码修改成功！");
+            setTimeout(function() {
+                window.location.href = "/login";
+            }, 1000);
+        </script>
+        <p>密码修改成功，1秒后跳转到登录页面...</p>
+    `))
+}
+
+func changeprofileHandler(c *gin.Context) {
+	tokenString := c.Query("token")
+	username := c.Query("username")
+
+	if !jwtValidator(c, tokenString) {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "无效或已过期的认证令牌"})
+		return
+	}
+
+	c.HTML(http.StatusOK, "changeprofiles.html", gin.H{
+		"username": username,
+	})
+}
+
+func changeprofileHandler1(c *gin.Context) {
+	newusername := c.PostForm("newusername")
+	newname := c.PostForm("newname")
+	username := c.PostForm("username")
+
+	mutex.RLock()
+	user := userStore[username]
+	mutex.RUnlock()
+
+	if newname == "" && newusername == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"message": "未发生更改",
+		})
+		return
+	}
+	if newusername == user.Username {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "用户名与原用户名相同",
+		})
+		return
+	}
+
+	if newname == user.Name {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "姓名与原姓名相同",
+		})
+		return
+	}
+
+	if newusername != "" {
+		mutex.Lock()
+		userStore[username].Username = newusername
+		mutex.Unlock()
+	}
+
+	if newname != "" {
+		mutex.Lock()
+		userStore[username].Name = newname
+		mutex.Unlock()
+	}
+
+	if err := saveUserstoFiles(); err != nil {
+		mutex.Lock()
+		delete(userStore, username)
+		mutex.Unlock()
+
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "保存用户数据失败",
+		})
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "信息修改成功",
+	})
+}
+
+func viewUserdataHandler(c *gin.Context) {
+	username := c.Query("username")
+	tokenString := c.Query("token")
+
+	if username != "admin" {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "权限不足，禁止访问",
+		})
+		return
+	}
+
+	if !jwtValidator(c, tokenString) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "token失效",
+		})
+		return
+	}
+
+	mutex.RLock()
+	usersData := make(map[string]gin.H)
+	for username, user := range userStore {
+		usersData[username] = gin.H{
+			"Username": user.Username,
+			"Name":     user.Name,
+			"Password": user.Password,
+		}
+	}
+	mutex.RUnlock()
+
+	c.JSON(http.StatusOK, gin.H{
+		"users": usersData,
+		"count": len(usersData),
+	})
 }
 
 func loadFiles() error {
@@ -285,4 +444,23 @@ func saveUserstoFiles() error {
 	}
 
 	return nil
+}
+
+func jwtValidator(c *gin.Context, tokenString string) bool {
+	claims := &CustomClaims{}
+	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (any, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			return nil, fmt.Errorf("非预期的签名方法: %v", token.Header["alg"])
+		}
+		return jwtSecret, nil
+	})
+
+	if err != nil || !token.Valid {
+		if !c.Writer.Written() {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "无效或已过期的认证令牌"})
+			c.Abort()
+		}
+		return false
+	}
+	return true
 }

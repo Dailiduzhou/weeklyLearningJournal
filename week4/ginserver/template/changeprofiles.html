@@ -47,19 +47,16 @@
     </style>
 </head>
 <body>
-    <h1>更改密码</h1>
-    <form action="/changepassword" method="POST">
+    <h1>更改用户{{.username}}信息</h1>
+    <form action="/changeprofiles" method="POST">
         <label for="username">用户名：</label>
-        <input type="text" id="username" name="username" required>
-
-        <label for="oldpassword">原密码：</label>
-        <input type="password" id="oldpassword" name="oldpassword" required>
+        <input type="text" id="username" name="username">
         
-        <label for="password">密码：</label>
-        <input type="password" id="password" name="password" required>
-
-        <label for="password1">再次输入密码：</label>
-        <input type="password" id="password1" name="password1" required>
+        <label for="newusername">新用户名：</label>
+        <input type="text" id="newusername" name="newusername">
+        
+        <label for="newname">新昵称：</label>
+        <input type="text" id="newname" name="newname">
         
         <input type="submit" value="提交">
     </form>
