@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>错误提示 - 用户管理系统</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f5f5f5;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            color: #333;
+        }
+        .error-container {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            text-align: center;
+            max-width: 500px;
+            width: 90%;
+        }
+        h2 {
+            color: #d9534f;
+            margin-bottom: 20px;
+        }
+        p {
+            margin: 15px 0;
+            line-height: 1.6;
+        }
+        a {
+            color: #337ab7;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .countdown {
+            font-weight: bold;
+            color: #337ab7;
+        }
+    </style>
+</head>
+<body>
+    <div class="error-container">
+        <h2>错误: {{.Message}}</h2>
+        <p><span class="countdown">{{.Delay}}</span> 毫秒后自动跳转到 <a href="{{.RedirectURL}}">{{.RedirectName}}</a>...</p>
+        
+        <script>
+            // 将模板变量以字符串形式插入，再转换为数字，避免 JS 语法错误
+            var delay = parseInt("{{.Delay}}", 10);
+            // 如果解析失败，设置一个默认值（例如 0），不改变整体逻辑：仍然立即或很快跳转
+            if (isNaN(delay)) {
+                delay = 0;
+            }
+
+            var redirectURL = "{{.RedirectURL}}";
+            var countdownEl = document.querySelector('.countdown');
+
+            // 如果页面初始显示的 delay 与 JS 中的数值不一致，可以同步一下
+            // 这里只在解析成功时更新一次，不更改原逻辑的单位（仍然是毫秒）
+            countdownEl.textContent = delay;
+
+            // 倒计时更新（每秒减少 1000 毫秒）
+            var countdownInterval = setInterval(function() {
+                delay -= 1000;
+                if (delay <= 0) {
+                    clearInterval(countdownInterval);
+                    window.location.href = redirectURL;
+                } else {
+                    countdownEl.textContent = delay;
+                }
+            }, 1000);
+
+            // 备用自动跳转，保持原逻辑不变
+            setTimeout(function() {
+                window.location.href = redirectURL;
+            }, delay);
+        </script>
+        
+        <p><a href="{{.RedirectURL}}">立即跳转</a></p>
+    </div>
+</body>
+</html>

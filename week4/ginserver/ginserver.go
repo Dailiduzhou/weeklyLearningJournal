@@ -201,52 +201,33 @@ func changepasswordhandler1(c *gin.Context) {
 	mutex.RUnlock()
 
 	if !exists {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "用户不存在",
-			"msg":   "即将跳转……",
+		c.HTML(http.StatusBadRequest, "error.html", gin.H{
+			"Message":      "用户不存在",
+			"RedirectURL":  "/changepassword",
+			"RedirectName": "修改密码页面",
+			"Delay":        1000,
 		})
-		// 使用JavaScript实现延迟跳转 ai-asissted
-		c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-		c.Writer.Write([]byte(`
-            <script>
-                setTimeout(function() {
-                    window.location.href = "/changepassword";
-                }, 1000);
-            </script>
-            <p>用户不存在，1秒后跳转...</p>
-        `))
 		return
 	}
 
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldpassword))
 	if err != nil {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": "原密码错误",
+		c.HTML(http.StatusBadRequest, "error.html", gin.H{
+			"Message":      "原密码错误",
+			"RedirectURL":  "/changepassword",
+			"RedirectName": "修改密码页面",
+			"Delay":        1000,
 		})
-
-		c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-		c.Writer.Write([]byte(`
-            <script>
-                setTimeout(function() {
-                    window.location.href = "/changepassword";
-                }, 1000);
-            </script>
-            <p>用户不存在，1秒后跳转...</p>
-        `))
 		return
 	}
 
 	if password != password1 {
-		c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-		c.Writer.Write([]byte(`
-            <script>
-                alert("两次密码不一致");
-                setTimeout(function() {
-                    window.location.href = "/changepassword";
-                }, 1000);
-            </script>
-            <p>密码不一致，1秒后跳转...</p>
-        `))
+		c.HTML(http.StatusBadRequest, "error.html", gin.H{
+			"Message":      "两次密码输入不一致",
+			"RedirectURL":  "/changepassword",
+			"RedirectName": "修改密码页面",
+			"Delay":        1000,
+		})
 		return
 	}
 
