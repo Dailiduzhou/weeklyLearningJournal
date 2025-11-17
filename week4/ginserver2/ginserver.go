@@ -61,7 +61,7 @@ func main() {
 	r.GET("/changeprofiles", changeprofileHandler)
 	r.POST("/changeprofiles", changeprofileHandler1)
 	r.GET("/userdata", viewUserdataHandler)
-	r.POST("/logout", logoutHandler)
+	r.GET("/logout", logoutHandler)
 
 	fmt.Println("服务器启动在 :8080")
 	fmt.Println("API文档地址: http://localhost:8080/docs")
@@ -180,7 +180,7 @@ func registerHandler1(c *gin.Context) {
 		mutex.Unlock()
 
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error极简主义": "保存用户数据失败",
+			"error": "保存用户数据失败",
 		})
 	}
 
@@ -401,7 +401,7 @@ func changeprofileHandler1(c *gin.Context) {
 		mutex.Unlock()
 
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "保存用户数据极简主义失败",
+			"error": "保存用户数据失败",
 		})
 	}
 

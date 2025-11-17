@@ -626,7 +626,7 @@ func changePasswordHandler(c *gin.Context) {
 //	    $ref: '#/definitions/APIResponse'
 func changepasswordhandler1(c *gin.Context) {
 	username := c.PostForm("username")
-	oldpassword := c.PostForm("odlpassword")
+	oldpassword := c.PostForm("oldpassword")
 	password := c.PostForm("password")
 	password1 := c.PostForm("password1")
 
