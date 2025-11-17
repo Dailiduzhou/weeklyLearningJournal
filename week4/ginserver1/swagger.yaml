@@ -1,0 +1,451 @@
+swagger: "2.0"
+info:
+  title: 用户管理API
+  description: 这是一个基于Gin框架的用户管理系统API，提供用户注册、登录、个人信息管理等功能
+  version: 1.0.0
+host: localhost:8080
+basePath: /
+schemes:
+  - http
+consumes:
+  - application/json
+  - application/x-www-form-urlencoded
+produces:
+  - application/json
+  - text/html
+securityDefinitions:
+  JWT:
+    type: apiKey
+    name: Authorization
+    in: header
+    description: JWT认证令牌，格式为"Bearer {token}"
+paths:
+  /register:
+    get:
+      tags:
+        - 页面
+      summary: 返回用户注册页面
+      operationId: registerPage
+      produces:
+        - text/html
+      responses:
+        '200':
+          description: 成功返回注册页面
+    post:
+      tags:
+        - 用户
+      summary: 注册新用户
+      operationId: registerUser
+      consumes:
+        - application/x-www-form-urlencoded
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: formData
+          description: 用户名
+          required: true
+          type: string
+        - name: password
+          in: formData
+          description: 密码
+          required: true
+          type: string
+        - name: name
+          in: formData
+          description: 姓名
+          required: true
+          type: string
+      responses:
+        '202':
+          description: 注册成功
+          schema:
+            $ref: '#/definitions/APIResponse'
+        '400':
+          description: 用户已存在
+          schema:
+            $ref: '#/definitions/APIResponse'
+        '500':
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/APIResponse'
+  /login:
+    get:
+      tags:
+        - 页面
+      summary: 返回用户登录页面
+      operationId: loginPage
+      produces:
+        - text/html
+      responses:
+        '200':
+          description: 成功返回登录页面
+    post:
+      tags:
+        - 用户
+      summary: 用户登录并返回JWT令牌
+      operationId: loginUser
+      consumes:
+        - application/x-www-form-urlencoded
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: formData
+          description: 用户名
+          required: true
+          type: string
+        - name: password
+          in: formData
+          description: 密码
+          required: true
+          type: string
+      responses:
+        '302':
+          description: 登录成功，重定向到个人资料页面
+        '400':
+          description: 用户不存在
+          schema:
+            $ref: '#/definitions/APIResponse'
+        '403':
+          description: 密码错误
+          schema:
+            $ref: '#/definitions/APIResponse'
+        '500':
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/APIResponse'
+  /profiles:
+    get:
+      tags:
+        - 用户
+      summary: 返回用户个人资料页面
+      operationId: getProfile
+      produces:
+        - text/html
+      parameters:
+        - name: token
+          in: query
+          description: JWT认证令牌
+          required: true
+          type: string
+        - name: username
+          in: query
+          description: 用户名
+          required: true
+          type: string
+      responses:
+        '200':
+          description: 成功返回个人资料页面
+        '401':
+          description: 无效或已过期的认证令牌
+          schema:
+            $ref: '#/definitions/APIResponse'
+  /changepassword:
+    get:
+      tags:
+        - 页面
+      summary: 返回修改密码页面
+      operationId: changePasswordPage
+      produces:
+        - text/html
+      responses:
+        '200':
+          description: 成功返回修改密码页面
+    post:
+      tags:
+        - 用户
+      summary: 修改用户密码
+      operationId: changePassword
+      consumes:
+        - application/x-www-form-urlencoded
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: formData
+          description: 用户名
+          required: true
+          type: string
+        - name: oldpassword
+          in: formData
+          description: 原密码
+          required: true
+          type: string
+        - name: password
+          in: formData
+          description: 新密码
+          required: true
+          type: string
+        - name: password1
+          in: formData
+          description: 确认新密码
+          required: true
+          type: string
+      responses:
+        '200':
+          description: 密码修改成功
+        '400':
+          description: 用户不存在
+        '403':
+          description: 原密码错误
+        '500':
+          description: 服务器内部错误
+  /changeprofiles:
+    get:
+      tags:
+        - 页面
+      summary: 返回修改个人信息页面
+      operationId: changeProfilePage
+      produces:
+        - text/html
+      parameters:
+        - name: token
+          in: query
+          description: JWT认证令牌
+          required: true
+          type: string
+        - name: username
+          in: query
+          description: 用户名
+          required: true
+          type: string
+      responses:
+        '200':
+          description: 成功返回修改个人信息页面
+        '401':
+          description: 无效或已过期的认证令牌
+          schema:
+            $ref: '#/definitions/APIResponse'
+    post:
+      tags:
+        - 用户
+      summary: 修改用户个人信息
+      operationId: changeProfile
+      consumes:
+        - application/x-www-form-urlencoded
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: formData
+          description: 原用户名
+          required: true
+          type: string
+        - name: newusername
+          in: formData
+          description: 新用户名
+          type: string
+        - name: newname
+          in: formData
+          description: 新姓名
+          type: string
+      responses:
+        '200':
+          description: 信息修改成功
+          schema:
+            $ref: '#/definitions/APIResponse'
+        '400':
+          description: 未发生更改或用户名/姓名与原值相同
+          schema:
+            $ref: '#/definitions/APIResponse'
+        '500':
+          description: 服务器内部错误
+          schema:
+            $ref: '#/definitions/APIResponse'
+  /userdata:
+    get:
+      tags:
+        - 用户
+      summary: 管理员查看所有用户数据
+      operationId: getUserData
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: query
+          description: 用户名（必须为admin）
+          required: true
+          type: string
+        - name: token
+          in: query
+          description: JWT认证令牌
+          required: true
+          type: string
+      responses:
+        '200':
+          description: 成功返回用户数据
+          schema:
+            type: object
+            properties:
+              users:
+                type: object
+                description: 用户数据映射
+              count:
+                type: integer
+                description: 用户数量
+        '403':
+          description: 权限不足或token失效
+          schema:
+            $ref: '#/definitions/APIResponse'
+  /swagger.json:
+    get:
+      tags:
+        - 文档
+      summary: 返回 Swagger JSON 格式的 API 文档
+      operationId: getSwaggerJSON
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: 成功返回 Swagger JSON 文档
+  /docs:
+    get:
+      tags:
+        - 文档
+      summary: 返回 Swagger UI 界面
+      operationId: getSwaggerUI
+      produces:
+        - text/html
+      responses:
+        '200':
+          description: 成功返回 Swagger UI
+definitions:
+  APIResponse:
+    type: object
+    properties:
+      message:
+        type: string
+        description: 消息
+      error:
+        type: string
+        description: 错误信息
+      data:
+        type: object
+        description: 用户数据
+  User:
+    type: object
+    required:
+      - username
+      - password
+      - name
+    properties:
+      username:
+        type: string
+        description: 用户名
+        example: "john_doe"
+      password:
+        type: string
+        description: 密码
+        example: "password123"
+      name:
+        type: string
+        description: 姓名
+        example: "John Doe"
+  LoginRequest:
+    type: object
+    required:
+      - username
+      - password
+    properties:
+      username:
+        type: string
+        description: 用户名
+        example: "john_doe"
+      password:
+        type: string
+        description: 密码
+        example: "password123"
+  RegisterRequest:
+    type: object
+    required:
+      - username
+      - password
+      - name
+    properties:
+      username:
+        type: string
+        description: 用户名
+        example: "john_doe"
+      password:
+        type: string
+        description: 密码
+        example: "password123"
+      name:
+        type: string
+        description: 姓名
+        example: "John Doe"
+  ChangePasswordRequest:
+    type: object
+    required:
+      - username
+      - oldpassword
+      - password
+      - password1
+    properties:
+      username:
+        type: string
+        description: 用户名
+        example: "john_doe"
+      oldpassword:
+        type: string
+        description: 原密码
+        example: "oldpassword123"
+      password:
+        type: string
+        description: 新密码
+        example: "newpassword123"
+      password1:
+        type: string
+        description: 确认新密码
+        example: "newpassword123"
+  ChangeProfileRequest:
+    type: object
+    required:
+      - username
+    properties:
+      username:
+        type: string
+        description: 原用户名
+        example: "john_doe"
+      newusername:
+        type: string
+        description: 新用户名
+        example: "john_new"
+      newname:
+        type: string
+        description: 新姓名
+        example: "John New"
+  CustomClaims:
+    type: object
+    properties:
+      username:
+        type: string
+        description: 用户名
+      RegisteredClaims:
+        type: object
+        description: JWT注册声明
+        properties:
+          issuer:
+            type: string
+            description: 签发者
+          subject:
+            type: string
+            description: 主题
+          audience:
+            type: array
+            items:
+              type: string
+            description: 受众
+          expiresAt:
+            type: integer
+            description: 过期时间戳
+          notBefore:
+            type: integer
+            description: 生效时间戳
+          issuedAt:
+            type: integer
+            description: 签发时间戳
+          id:
+            type: string
+            description: JWT ID
