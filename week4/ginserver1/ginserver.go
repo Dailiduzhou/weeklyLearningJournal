@@ -582,6 +582,7 @@ func changePasswordHandler(c *gin.Context) {
 // consumes:
 // - application/x-www-form-urlencoded
 // produces:
+// - text/html
 // - application/json
 // parameters:
 //   - name: username
@@ -609,12 +610,20 @@ func changePasswordHandler(c *gin.Context) {
 //
 //	'200':
 //	  description: 密码修改成功
+//	  schema:
+//	    type: string
 //	'400':
-//	  description: 用户不存在
+//	  description: 用户不存在或两次密码不一致
+//	  schema:
+//	    $ref: '#/definitions/APIResponse'
 //	'403':
 //	  description: 原密码错误
+//	  schema:
+//	    $ref: '#/definitions/APIResponse'
 //	'500':
 //	  description: 服务器内部错误
+//	  schema:
+//	    $ref: '#/definitions/APIResponse'
 func changepasswordhandler1(c *gin.Context) {
 	username := c.PostForm("username")
 	oldpassword := c.PostForm("odlpassword")
@@ -626,51 +635,33 @@ func changepasswordhandler1(c *gin.Context) {
 	mutex.RUnlock()
 
 	if !exists {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "用户不存在",
-			"msg":   "即将跳转……",
+		c.HTML(http.StatusBadRequest, "error.html", gin.H{
+			"Message":      "用户不存在",
+			"RedirectURL":  "/changepassword",
+			"RedirectName": "修改密码页面",
+			"Delay":        1000,
 		})
-		c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-		c.Writer.Write([]byte(`
-            <script>
-                setTimeout(function() {
-                    window.location.href = "/changepassword";
-                }, 1000);
-            </script>
-            <p>用户不存在，1秒后跳转...</p>
-        `))
 		return
 	}
 
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldpassword))
 	if err != nil {
-		c.JSON(http.StatusForbidden, gin.H{
-			"error": "原密码错误",
+		c.HTML(http.StatusBadRequest, "error.html", gin.H{
+			"Message":      "原密码错误",
+			"RedirectURL":  "/changepassword",
+			"RedirectName": "修改密码页面",
+			"Delay":        1000,
 		})
-
-		c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-		c.Writer.Write([]byte(`
-            <script>
-                setTimeout(function() {
-                    window.location.href = "/changepassword";
-                }, 1000);
-            </script>
-            <p>用户不存在，1秒后跳转...</p>
-        `))
 		return
 	}
 
 	if password != password1 {
-		c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-		c.Writer.Write([]byte(`
-            <script>
-                alert("两次密码不一致");
-                setTimeout(function() {
-                    window.location.href = "/changepassword";
-                }, 1000);
-            </script>
-            <p>密码不一致，1秒后跳转...</p>
-        `))
+		c.HTML(http.StatusBadRequest, "error.html", gin.H{
+			"Message":      "两次密码输入不一致",
+			"RedirectURL":  "/changepassword",
+			"RedirectName": "修改密码页面",
+			"Delay":        1000,
+		})
 		return
 	}
 
@@ -694,16 +685,9 @@ func changepasswordhandler1(c *gin.Context) {
 		})
 	}
 
-	c.Writer.Header().Set("Content-Type", "text/html; charset=utf-8")
-	c.Writer.Write([]byte(`
-        <script>
-            alert("密码修改成功！");
-            setTimeout(function() {
-                window.location.href = "/login";
-            }, 1000);
-        </script>
-        <p>密码修改成功，1秒后跳转到登录页面...</p>
-    `))
+	c.JSON(http.StatusOK, gin.H{
+		"message": "密码修改成功",
+	})
 }
 
 // changeprofileHandler 显示修改个人信息页面
