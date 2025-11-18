@@ -21,14 +21,14 @@
   "paths": {
     "/changepassword": {
       "get": {
-        "tags": [
-          "页面"
-        ],
-        "summary": "返回修改密码页面",
-        "operationId": "changePasswordPage",
+        "description": "返回修改密码页面",
         "produces": [
           "text/html"
         ],
+        "tags": [
+          "页面"
+        ],
+        "operationId": "changePasswordPage",
         "responses": {
           "200": {
             "description": "成功返回修改密码页面"
@@ -36,11 +36,7 @@
         }
       },
       "post": {
-        "tags": [
-          "用户"
-        ],
-        "summary": "修改用户密码",
-        "operationId": "changePassword",
+        "description": "修改用户密码",
         "consumes": [
           "application/x-www-form-urlencoded"
         ],
@@ -48,42 +44,49 @@
           "text/html",
           "application/json"
         ],
+        "tags": [
+          "用户"
+        ],
+        "operationId": "changePassword",
         "parameters": [
           {
+            "type": "string",
+            "description": "用户名",
             "name": "username",
             "in": "formData",
-            "description": "用户名",
-            "required": true,
-            "type": "string"
+            "required": true
           },
           {
+            "type": "string",
+            "description": "原密码",
             "name": "oldpassword",
             "in": "formData",
-            "description": "原密码",
-            "required": true,
-            "type": "string"
+            "required": true
           },
           {
+            "type": "string",
+            "description": "新密码",
             "name": "password",
             "in": "formData",
-            "description": "新密码",
-            "required": true,
-            "type": "string"
+            "required": true
           },
           {
+            "type": "string",
+            "description": "确认新密码",
             "name": "password1",
             "in": "formData",
-            "description": "确认新密码",
-            "required": true,
-            "type": "string"
+            "required": true
           }
         ],
         "responses": {
           "200": {
-            "description": "密码修改成功"
+            "description": "密码修改成功",
+            "schema": {
+              "$ref": "#/definitions/APIResponse"
+            }
           },
           "400": {
-            "description": "用户不存在或两次密码不一致",
+            "description": "用户不存在或两次密码不一致或信息为空",
             "schema": {
               "$ref": "#/definitions/APIResponse"
             }
@@ -105,33 +108,39 @@
     },
     "/changeprofiles": {
       "get": {
-        "tags": [
-          "页面"
-        ],
-        "summary": "返回修改个人信息页面",
-        "operationId": "changeProfilePage",
+        "description": "返回修改个人信息页面",
         "produces": [
           "text/html"
         ],
+        "tags": [
+          "页面"
+        ],
+        "operationId": "changeProfilePage",
         "parameters": [
           {
+            "type": "string",
+            "description": "JWT认证令牌",
             "name": "token",
             "in": "query",
-            "description": "JWT认证令牌",
-            "required": true,
-            "type": "string"
+            "required": true
           },
           {
+            "type": "string",
+            "description": "用户名",
             "name": "username",
             "in": "query",
-            "description": "用户名",
-            "required": true,
-            "type": "string"
+            "required": true
           }
         ],
         "responses": {
           "200": {
             "description": "成功返回修改个人信息页面"
+          },
+          "400": {
+            "description": "认证令牌和用户名不能为空",
+            "schema": {
+              "$ref": "#/definitions/APIResponse"
+            }
           },
           "401": {
             "description": "无效或已过期的认证令牌",
@@ -142,36 +151,36 @@
         }
       },
       "post": {
-        "tags": [
-          "用户"
-        ],
-        "summary": "修改用户个人信息",
-        "operationId": "changeProfile",
+        "description": "修改用户个人信息",
         "consumes": [
           "application/x-www-form-urlencoded"
         ],
         "produces": [
           "application/json"
         ],
+        "tags": [
+          "用户"
+        ],
+        "operationId": "changeProfile",
         "parameters": [
           {
+            "type": "string",
+            "description": "原用户名",
             "name": "username",
             "in": "formData",
-            "description": "原用户名",
-            "required": true,
-            "type": "string"
+            "required": true
           },
           {
-            "name": "newusername",
-            "in": "formData",
+            "type": "string",
             "description": "新用户名",
-            "type": "string"
+            "name": "newusername",
+            "in": "formData"
           },
           {
-            "name": "newname",
-            "in": "formData",
+            "type": "string",
             "description": "新姓名",
-            "type": "string"
+            "name": "newname",
+            "in": "formData"
           }
         ],
         "responses": {
@@ -182,7 +191,7 @@
             }
           },
           "400": {
-            "description": "未发生更改或用户名/姓名与原值相同",
+            "description": "未发生更改或用户名/姓名与原值相同或信息为空",
             "schema": {
               "$ref": "#/definitions/APIResponse"
             }
@@ -198,14 +207,14 @@
     },
     "/docs": {
       "get": {
-        "tags": [
-          "文档"
-        ],
-        "summary": "返回 Swagger UI 界面",
-        "operationId": "getSwaggerUI",
+        "description": "返回 Swagger UI 界面",
         "produces": [
           "text/html"
         ],
+        "tags": [
+          "文档"
+        ],
+        "operationId": "getSwaggerUI",
         "responses": {
           "200": {
             "description": "成功返回 Swagger UI"
@@ -215,14 +224,14 @@
     },
     "/login": {
       "get": {
-        "tags": [
-          "页面"
-        ],
-        "summary": "返回用户登录页面",
-        "operationId": "loginPage",
+        "description": "返回用户登录页面",
         "produces": [
           "text/html"
         ],
+        "tags": [
+          "页面"
+        ],
+        "operationId": "loginPage",
         "responses": {
           "200": {
             "description": "成功返回登录页面"
@@ -230,31 +239,31 @@
         }
       },
       "post": {
-        "tags": [
-          "用户"
-        ],
-        "summary": "用户登录并返回JWT令牌",
-        "operationId": "loginUser",
+        "description": "用户登录并返回JWT令牌",
         "consumes": [
           "application/x-www-form-urlencoded"
         ],
         "produces": [
           "application/json"
         ],
+        "tags": [
+          "用户"
+        ],
+        "operationId": "loginUser",
         "parameters": [
           {
+            "type": "string",
+            "description": "用户名",
             "name": "username",
             "in": "formData",
-            "description": "用户名",
-            "required": true,
-            "type": "string"
+            "required": true
           },
           {
+            "type": "string",
+            "description": "密码",
             "name": "password",
             "in": "formData",
-            "description": "密码",
-            "required": true,
-            "type": "string"
+            "required": true
           }
         ],
         "responses": {
@@ -262,7 +271,7 @@
             "description": "登录成功，重定向到个人资料页面"
           },
           "400": {
-            "description": "用户不存在",
+            "description": "用户不存在或信息为空",
             "schema": {
               "$ref": "#/definitions/APIResponse"
             }
@@ -284,33 +293,39 @@
     },
     "/profiles": {
       "get": {
-        "tags": [
-          "用户"
-        ],
-        "summary": "返回用户个人资料页面",
-        "operationId": "getProfile",
+        "description": "返回用户个人资料页面",
         "produces": [
           "text/html"
         ],
+        "tags": [
+          "用户"
+        ],
+        "operationId": "getProfile",
         "parameters": [
           {
+            "type": "string",
+            "description": "JWT认证令牌",
             "name": "token",
             "in": "query",
-            "description": "JWT认证令牌",
-            "required": true,
-            "type": "string"
+            "required": true
           },
           {
+            "type": "string",
+            "description": "用户名",
             "name": "username",
             "in": "query",
-            "description": "用户名",
-            "required": true,
-            "type": "string"
+            "required": true
           }
         ],
         "responses": {
           "200": {
             "description": "成功返回个人资料页面"
+          },
+          "400": {
+            "description": "认证令牌和用户名不能为空",
+            "schema": {
+              "$ref": "#/definitions/APIResponse"
+            }
           },
           "401": {
             "description": "无效或已过期的认证令牌",
@@ -323,14 +338,14 @@
     },
     "/register": {
       "get": {
-        "tags": [
-          "页面"
-        ],
-        "summary": "返回用户注册页面",
-        "operationId": "registerPage",
+        "description": "返回用户注册页面",
         "produces": [
           "text/html"
         ],
+        "tags": [
+          "页面"
+        ],
+        "operationId": "registerPage",
         "responses": {
           "200": {
             "description": "成功返回注册页面"
@@ -338,38 +353,38 @@
         }
       },
       "post": {
-        "tags": [
-          "用户"
-        ],
-        "summary": "注册新用户",
-        "operationId": "registerUser",
+        "description": "注册新用户",
         "consumes": [
           "application/x-www-form-urlencoded"
         ],
         "produces": [
           "application/json"
         ],
+        "tags": [
+          "用户"
+        ],
+        "operationId": "registerUser",
         "parameters": [
           {
+            "type": "string",
+            "description": "用户名",
             "name": "username",
             "in": "formData",
-            "description": "用户名",
-            "required": true,
-            "type": "string"
+            "required": true
           },
           {
+            "type": "string",
+            "description": "密码",
             "name": "password",
             "in": "formData",
-            "description": "密码",
-            "required": true,
-            "type": "string"
+            "required": true
           },
           {
+            "type": "string",
+            "description": "姓名",
             "name": "name",
             "in": "formData",
-            "description": "姓名",
-            "required": true,
-            "type": "string"
+            "required": true
           }
         ],
         "responses": {
@@ -380,7 +395,7 @@
             }
           },
           "400": {
-            "description": "用户已存在",
+            "description": "用户已存在或信息为空",
             "schema": {
               "$ref": "#/definitions/APIResponse"
             }
@@ -396,14 +411,14 @@
     },
     "/swagger.json": {
       "get": {
-        "tags": [
-          "文档"
-        ],
-        "summary": "返回 Swagger JSON 格式的 API 文档",
-        "operationId": "getSwaggerJSON",
+        "description": "返回 Swagger JSON 格式的 API 文档",
         "produces": [
           "application/json"
         ],
+        "tags": [
+          "文档"
+        ],
+        "operationId": "getSwaggerJSON",
         "responses": {
           "200": {
             "description": "成功返回 Swagger JSON 文档"
@@ -413,28 +428,28 @@
     },
     "/userdata": {
       "get": {
-        "tags": [
-          "用户"
-        ],
-        "summary": "管理员查看所有用户数据",
-        "operationId": "getUserData",
+        "description": "管理员查看所有用户数据",
         "produces": [
           "application/json"
         ],
+        "tags": [
+          "用户"
+        ],
+        "operationId": "getUserData",
         "parameters": [
           {
+            "type": "string",
+            "description": "用户名（必须为admin）",
             "name": "username",
             "in": "query",
-            "description": "用户名（必须为admin）",
-            "required": true,
-            "type": "string"
+            "required": true
           },
           {
+            "type": "string",
+            "description": "JWT认证令牌",
             "name": "token",
             "in": "query",
-            "description": "JWT认证令牌",
-            "required": true,
-            "type": "string"
+            "required": true
           }
         ],
         "responses": {
@@ -454,6 +469,12 @@
               }
             }
           },
+          "400": {
+            "description": "用户名和认证令牌不能为空",
+            "schema": {
+              "$ref": "#/definitions/APIResponse"
+            }
+          },
           "403": {
             "description": "权限不足或token失效",
             "schema": {
@@ -464,32 +485,7 @@
       }
     }
   },
-  "securityDefinitions": {
-    "JWT": {
-      "type": "apiKey",
-      "name": "Authorization",
-      "in": "header",
-      "description": "JWT认证令牌，格式为\"Bearer {token}\""
-    }
-  },
   "definitions": {
-    "APIResponse": {
-      "type": "object",
-      "properties": {
-        "message": {
-          "type": "string",
-          "description": "消息"
-        },
-        "error": {
-          "type": "string",
-          "description": "错误信息"
-        },
-        "data": {
-          "type": "object",
-          "description": "用户数据"
-        }
-      }
-    },
     "User": {
       "type": "object",
       "required": [
@@ -500,17 +496,14 @@
       "properties": {
         "username": {
           "type": "string",
-          "description": "用户名",
           "example": "john_doe"
         },
         "password": {
           "type": "string",
-          "description": "密码",
           "example": "password123"
         },
         "name": {
           "type": "string",
-          "description": "姓名",
           "example": "John Doe"
         }
       }
@@ -524,12 +517,10 @@
       "properties": {
         "username": {
           "type": "string",
-          "description": "用户名",
           "example": "john_doe"
         },
         "password": {
           "type": "string",
-          "description": "密码",
           "example": "password123"
         }
       }
@@ -544,17 +535,14 @@
       "properties": {
         "username": {
           "type": "string",
-          "description": "用户名",
           "example": "john_doe"
         },
         "password": {
           "type": "string",
-          "description": "密码",
           "example": "password123"
         },
         "name": {
           "type": "string",
-          "description": "姓名",
           "example": "John Doe"
         }
       }
@@ -570,22 +558,18 @@
       "properties": {
         "username": {
           "type": "string",
-          "description": "用户名",
           "example": "john_doe"
         },
         "oldpassword": {
           "type": "string",
-          "description": "原密码",
           "example": "oldpassword123"
         },
         "password": {
           "type": "string",
-          "description": "新密码",
           "example": "newpassword123"
         },
         "password1": {
           "type": "string",
-          "description": "确认新密码",
           "example": "newpassword123"
         }
       }
@@ -598,20 +582,39 @@
       "properties": {
         "username": {
           "type": "string",
-          "description": "原用户名",
           "example": "john_doe"
         },
         "newusername": {
           "type": "string",
-          "description": "新用户名",
           "example": "john_new"
         },
         "newname": {
           "type": "string",
-          "description": "新姓名",
           "example": "John New"
         }
       }
+    },
+    "APIResponse": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        },
+        "data": {
+          "type": "object"
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "JWT": {
+      "type": "apiKey",
+      "name": "Authorization",
+      "in": "header",
+      "description": "JWT认证令牌，格式为\"Bearer {token}\""
     }
   }
 }

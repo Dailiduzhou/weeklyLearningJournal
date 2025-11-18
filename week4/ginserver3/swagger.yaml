@@ -1,0 +1,458 @@
+swagger: "2.0"
+info:
+  description: 基于Gin框架的用户管理系统，提供完整的用户认证和个人信息管理功能
+  version: 1.0.0
+  title: 用户管理API
+host: localhost:8080
+basePath: /
+schemes:
+  - http
+consumes:
+  - application/json
+  - application/x-www-form-urlencoded
+produces:
+  - application/json
+  - text/html
+securityDefinitions:
+  sessionAuth:
+    type: apiKey
+    name: Cookie
+    in: header
+    description: 会话认证，基于cookie。登录后服务端会在响应头中设置authSession cookie
+paths:
+  /swagger.json:
+    get:
+      tags:
+        - 文档
+      summary: 获取Swagger规范文档
+      description: 返回符合OpenAPI规范的Swagger JSON文档
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: Swagger JSON文档
+          schema:
+            type: string
+            format: binary
+  /docs:
+    get:
+      tags:
+        - 文档
+      summary: Swagger UI界面
+      description: 返回交互式的API文档界面
+      produces:
+        - text/html
+      responses:
+        "200":
+          description: Swagger UI HTML页面
+          schema:
+            type: string
+  /docs/{any}:
+    get:
+      tags:
+        - 文档
+      summary: Swagger UI界面
+      description: 返回交互式的API文档界面
+      produces:
+        - text/html
+      parameters:
+        - name: any
+          in: path
+          required: true
+          type: string
+      responses:
+        "200":
+          description: Swagger UI HTML页面
+          schema:
+            type: string
+  /register:
+    get:
+      tags:
+        - 页面
+      summary: 用户注册页面
+      description: 返回用户注册表单页面
+      produces:
+        - text/html
+      responses:
+        "200":
+          description: 注册页面HTML
+          schema:
+            type: string
+  /api/users:
+    post:
+      tags:
+        - 用户
+      summary: 创建新用户
+      description: 创建新用户账户
+      consumes:
+        - application/x-www-form-urlencoded
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: formData
+          description: 用户名
+          required: true
+          type: string
+          minLength: 3
+          maxLength: 20
+        - name: password
+          in: formData
+          description: 密码
+          required: true
+          type: string
+          minLength: 6
+        - name: name
+          in: formData
+          description: 姓名
+          required: true
+          type: string
+          minLength: 1
+          maxLength: 50
+      responses:
+        "201":
+          description: 用户创建成功
+          schema:
+            properties:
+              username:
+                type: string
+                example: "john_doe"
+              name:
+                type: string
+                example: "张三"
+        "400":
+          description: 用户名、密码和姓名不能为空或用户名已存在
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "500":
+          description: 用户数据保存失败或密码加密失败
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+    get:
+      tags:
+        - 管理
+      summary: 获取所有用户列表
+      description: 管理员获取所有注册用户的数据
+      produces:
+        - application/json
+      security:
+        - sessionAuth: []
+      responses:
+        "200":
+          description: 返回所有用户数据
+          schema:
+            $ref: '#/definitions/UserListResponse'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: 权限不足，需要管理员权限
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /login:
+    get:
+      tags:
+        - 页面
+      summary: 用户登录页面
+      description: 返回用户登录表单页面
+      produces:
+        - text/html
+      responses:
+        "200":
+          description: 登录页面HTML
+          schema:
+            type: string
+  /api/auth/login:
+    post:
+      tags:
+        - 认证
+      summary: 用户登录
+      description: 验证用户凭证并创建会话
+      consumes:
+        - application/x-www-form-urlencoded
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: formData
+          description: 用户名
+          required: true
+          type: string
+        - name: password
+          in: formData
+          description: 密码
+          required: true
+          type: string
+      responses:
+        "200":
+          description: 登录成功，返回用户信息
+          schema:
+            properties:
+              username:
+                type: string
+                example: "john_doe"
+              name:
+                type: string
+                example: "张三"
+        "400":
+          description: 用户名和密码不能为空
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: 密码错误
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/auth/logout:
+    post:
+      tags:
+        - 认证
+      summary: 用户登出
+      description: 清除用户会话
+      produces:
+        - application/json
+      responses:
+        "200":
+          description: 登出成功
+          schema:
+            $ref: '#/definitions/SuccessResponse'
+  /profiles:
+    get:
+      tags:
+        - 页面
+      summary: 个人资料页面
+      description: 显示当前登录用户的个人资料
+      produces:
+        - text/html
+      responses:
+        "200":
+          description: 个人资料页面HTML
+          schema:
+            type: string
+        "302":
+          description: 未登录，重定向到登录页
+  /api/users/me:
+    get:
+      tags:
+        - 用户
+      summary: 获取当前用户信息
+      description: 获取当前登录用户的详细信息
+      produces:
+        - application/json
+      security:
+        - sessionAuth: []
+      responses:
+        "200":
+          description: 返回当前用户信息
+          schema:
+            properties:
+              username:
+                type: string
+                example: "john_doe"
+              name:
+                type: string
+                example: "张三"
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+    put:
+      tags:
+        - 用户
+      summary: 更新当前用户资料
+      description: 更新当前登录用户的用户名和姓名
+      consumes:
+        - application/x-www-form-urlencoded
+      produces:
+        - application/json
+      parameters:
+        - name: username
+          in: formData
+          description: 新用户名
+          required: false
+          type: string
+        - name: name
+          in: formData
+          description: 新姓名
+          required: false
+          type: string
+      security:
+        - sessionAuth: []
+      responses:
+        "200":
+          description: 资料修改成功，返回更新后的用户信息
+          schema:
+            properties:
+              username:
+                type: string
+                example: "john_doe_new"
+              name:
+                type: string
+                example: "李四"
+        "400":
+          description: 未检测到有效更改或新用户名与原用户名相同或新姓名与原姓名相同或新用户名已存在
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "500":
+          description: 资料更新失败
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /api/users/me/password:
+    put:
+      tags:
+        - 用户
+      summary: 修改当前用户密码
+      description: 修改当前登录用户的密码
+      consumes:
+        - application/x-www-form-urlencoded
+      produces:
+        - application/json
+      parameters:
+        - name: oldpassword
+          in: formData
+          description: 原密码
+          required: true
+          type: string
+        - name: password
+          in: formData
+          description: 新密码
+          required: true
+          type: string
+        - name: password1
+          in: formData
+          description: 确认新密码
+          required: true
+          type: string
+      security:
+        - sessionAuth: []
+      responses:
+        "200":
+          description: 密码修改成功
+          schema:
+            $ref: '#/definitions/SuccessResponse'
+        "400":
+          description: 所有密码字段不能为空或原密码错误或两次输入的新密码不一致
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "401":
+          description: 未认证
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "403":
+          description: 原密码错误
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+        "500":
+          description: 密码加密失败或密码更新失败
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /admin/users:
+    get:
+      tags:
+        - 管理
+        - 页面
+      summary: 管理员用户列表页面
+      description: 返回管理员查看用户列表的页面
+      produces:
+        - text/html
+      security:
+        - sessionAuth: []
+      responses:
+        "200":
+          description: 管理员用户列表页面HTML
+          schema:
+            type: string
+        "302":
+          description: 未登录或非管理员，重定向到登录页
+        "403":
+          description: 权限不足，需要管理员权限
+          schema:
+            $ref: '#/definitions/ErrorResponse'
+  /userdata:
+    get:
+      tags:
+        - 兼容
+      summary: 兼容旧接口
+      description: 旧版获取用户数据接口，已废弃，将重定向到新接口
+      produces:
+        - application/json
+      responses:
+        "301":
+          description: 永久重定向到新接口
+          headers:
+            Location:
+              type: string
+              description: 重定向到的新URL
+definitions:
+  User:
+    type: object
+    properties:
+      id:
+        type: string
+        description: 用户ID，唯一标识
+        example: "1"
+      username:
+        type: string
+        description: 用户名，唯一标识
+        example: "john_doe"
+      password:
+        type: string
+        description: 密码（bcrypt加密存储）
+        example: "$2a$10$xyz..."
+      name:
+        type: string
+        description: 用户真实姓名
+        example: "张三"
+    required:
+      - username
+      - name
+  SuccessResponse:
+    type: object
+    properties:
+      message:
+        type: string
+        description: 响应消息
+        example: "操作成功"
+    required:
+      - message
+  ErrorResponse:
+    type: object
+    properties:
+      error:
+        type: string
+        description: 错误信息
+        example: "操作失败"
+    required:
+      - error
+  UserListResponse:
+    type: object
+    properties:
+      users:
+        type: array
+        description: 用户数据列表
+        items:
+          $ref: '#/definitions/User'
+      count:
+        type: integer
+        format: int32
+        description: 用户数量
+    required:
+      - users
+      - count
+tags:
+  - name: 文档
+    description: API文档相关接口
+  - name: 页面
+    description: 前端页面相关接口
+  - name: 用户
+    description: 用户相关操作接口
+  - name: 认证
+    description: 用户认证相关接口
+  - name: 管理
+    description: 管理员功能接口
+  - name: 兼容
+    description: 旧版接口兼容

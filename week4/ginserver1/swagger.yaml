@@ -1,425 +1,421 @@
 swagger: "2.0"
 info:
-  title: 用户管理API
-  description: 这是一个基于Gin框架的用户管理系统API，提供用户注册、登录、个人信息管理等功能
+  description: "这是一个基于Gin框架的用户管理系统API，提供用户注册、登录、个人信息管理等功能"
+  title: "用户管理API"
   version: "1.0.0"
-host: localhost:8080
-basePath: /
+host: "localhost:8080"
+basePath: "/"
 schemes:
-  - http
+  - "http"
 consumes:
-  - application/json
-  - application/x-www-form-urlencoded
+  - "application/json"
+  - "application/x-www-form-urlencoded"
 produces:
-  - application/json
-  - text/html
+  - "application/json"
+  - "text/html"
 paths:
   /changepassword:
     get:
-      tags:
-        - 页面
-      summary: 返回修改密码页面
-      operationId: changePasswordPage
+      description: "返回修改密码页面"
+      operationId: "changePasswordPage"
       produces:
-        - text/html
+        - "text/html"
+      tags:
+        - "页面"
       responses:
-        '200':
-          description: 成功返回修改密码页面
+        "200":
+          description: "成功返回修改密码页面"
     post:
-      tags:
-        - 用户
-      summary: 修改用户密码
-      operationId: changePassword
       consumes:
-        - application/x-www-form-urlencoded
-      produces:
-        - text/html
-        - application/json
+        - "application/x-www-form-urlencoded"
+      description: "修改用户密码"
+      operationId: "changePassword"
       parameters:
-        - name: username
-          in: formData
-          description: 用户名
+        - description: "用户名"
+          in: "formData"
+          name: "username"
           required: true
-          type: string
-        - name: oldpassword
-          in: formData
-          description: 原密码
+          type: "string"
+        - description: "原密码"
+          in: "formData"
+          name: "oldpassword"
           required: true
-          type: string
-        - name: password
-          in: formData
-          description: 新密码
+          type: "string"
+        - description: "新密码"
+          in: "formData"
+          name: "password"
           required: true
-          type: string
-        - name: password1
-          in: formData
-          description: 确认新密码
+          type: "string"
+        - description: "确认新密码"
+          in: "formData"
+          name: "password1"
           required: true
-          type: string
+          type: "string"
+      produces:
+        - "text/html"
+        - "application/json"
+      tags:
+        - "用户"
       responses:
-        '200':
-          description: 密码修改成功
-        '400':
-          description: 用户不存在或两次密码不一致
+        "200":
+          description: "密码修改成功"
           schema:
-            $ref: '#/definitions/APIResponse'
-        '403':
-          description: 原密码错误
+            $ref: "#/definitions/APIResponse"
+        "400":
+          description: "用户不存在或两次密码不一致或信息为空"
           schema:
-            $ref: '#/definitions/APIResponse'
-        '500':
-          description: 服务器内部错误
+            $ref: "#/definitions/APIResponse"
+        "403":
+          description: "原密码错误"
           schema:
-            $ref: '#/definitions/APIResponse'
+            $ref: "#/definitions/APIResponse"
+        "500":
+          description: "服务器内部错误"
+          schema:
+            $ref: "#/definitions/APIResponse"
   /changeprofiles:
     get:
-      tags:
-        - 页面
-      summary: 返回修改个人信息页面
-      operationId: changeProfilePage
-      produces:
-        - text/html
+      description: "返回修改个人信息页面"
+      operationId: "changeProfilePage"
       parameters:
-        - name: token
-          in: query
-          description: JWT认证令牌
+        - description: "JWT认证令牌"
+          in: "query"
+          name: "token"
           required: true
-          type: string
-        - name: username
-          in: query
-          description: 用户名
+          type: "string"
+        - description: "用户名"
+          in: "query"
+          name: "username"
           required: true
-          type: string
+          type: "string"
+      produces:
+        - "text/html"
+      tags:
+        - "页面"
       responses:
-        '200':
-          description: 成功返回修改个人信息页面
-        '401':
-          description: 无效或已过期的认证令牌
+        "200":
+          description: "成功返回修改个人信息页面"
+        "400":
+          description: "认证令牌和用户名不能为空"
           schema:
-            $ref: '#/definitions/APIResponse'
+            $ref: "#/definitions/APIResponse"
+        "401":
+          description: "无效或已过期的认证令牌"
+          schema:
+            $ref: "#/definitions/APIResponse"
     post:
-      tags:
-        - 用户
-      summary: 修改用户个人信息
-      operationId: changeProfile
       consumes:
-        - application/x-www-form-urlencoded
-      produces:
-        - application/json
+        - "application/x-www-form-urlencoded"
+      description: "修改用户个人信息"
+      operationId: "changeProfile"
       parameters:
-        - name: username
-          in: formData
-          description: 原用户名
+        - description: "原用户名"
+          in: "formData"
+          name: "username"
           required: true
-          type: string
-        - name: newusername
-          in: formData
-          description: 新用户名
-          type: string
-        - name: newname
-          in: formData
-          description: 新姓名
-          type: string
+          type: "string"
+        - description: "新用户名"
+          in: "formData"
+          name: "newusername"
+          type: "string"
+        - description: "新姓名"
+          in: "formData"
+          name: "newname"
+          type: "string"
+      produces:
+        - "application/json"
+      tags:
+        - "用户"
       responses:
-        '200':
-          description: 信息修改成功
+        "200":
+          description: "信息修改成功"
           schema:
-            $ref: '#/definitions/APIResponse'
-        '400':
-          description: 未发生更改或用户名/姓名与原值相同
+            $ref: "#/definitions/APIResponse"
+        "400":
+          description: "未发生更改或用户名/姓名与原值相同或信息为空"
           schema:
-            $ref: '#/definitions/APIResponse'
-        '500':
-          description: 服务器内部错误
+            $ref: "#/definitions/APIResponse"
+        "500":
+          description: "服务器内部错误"
           schema:
-            $ref: '#/definitions/APIResponse'
+            $ref: "#/definitions/APIResponse"
   /docs:
     get:
-      tags:
-        - 文档
-      summary: 返回 Swagger UI 界面
-      operationId: getSwaggerUI
+      description: "返回 Swagger UI 界面"
+      operationId: "getSwaggerUI"
       produces:
-        - text/html
+        - "text/html"
+      tags:
+        - "文档"
       responses:
-        '200':
-          description: 成功返回 Swagger UI
+        "200":
+          description: "成功返回 Swagger UI"
   /login:
     get:
-      tags:
-        - 页面
-      summary: 返回用户登录页面
-      operationId: loginPage
+      description: "返回用户登录页面"
+      operationId: "loginPage"
       produces:
-        - text/html
+        - "text/html"
+      tags:
+        - "页面"
       responses:
-        '200':
-          description: 成功返回登录页面
+        "200":
+          description: "成功返回登录页面"
     post:
-      tags:
-        - 用户
-      summary: 用户登录并返回JWT令牌
-      operationId: loginUser
       consumes:
-        - application/x-www-form-urlencoded
-      produces:
-        - application/json
+        - "application/x-www-form-urlencoded"
+      description: "用户登录并返回JWT令牌"
+      operationId: "loginUser"
       parameters:
-        - name: username
-          in: formData
-          description: 用户名
+        - description: "用户名"
+          in: "formData"
+          name: "username"
           required: true
-          type: string
-        - name: password
-          in: formData
-          description: 密码
+          type: "string"
+        - description: "密码"
+          in: "formData"
+          name: "password"
           required: true
-          type: string
+          type: "string"
+      produces:
+        - "application/json"
+      tags:
+        - "用户"
       responses:
-        '302':
-          description: 登录成功，重定向到个人资料页面
-        '400':
-          description: 用户不存在
+        "302":
+          description: "登录成功，重定向到个人资料页面"
+        "400":
+          description: "用户不存在或信息为空"
           schema:
-            $ref: '#/definitions/APIResponse'
-        '403':
-          description: 密码错误
+            $ref: "#/definitions/APIResponse"
+        "403":
+          description: "密码错误"
           schema:
-            $ref: '#/definitions/APIResponse'
-        '500':
-          description: 服务器内部错误
+            $ref: "#/definitions/APIResponse"
+        "500":
+          description: "服务器内部错误"
           schema:
-            $ref: '#/definitions/APIResponse'
+            $ref: "#/definitions/APIResponse"
   /profiles:
     get:
-      tags:
-        - 用户
-      summary: 返回用户个人资料页面
-      operationId: getProfile
-      produces:
-        - text/html
+      description: "返回用户个人资料页面"
+      operationId: "getProfile"
       parameters:
-        - name: token
-          in: query
-          description: JWT认证令牌
+        - description: "JWT认证令牌"
+          in: "query"
+          name: "token"
           required: true
-          type: string
-        - name: username
-          in: query
-          description: 用户名
+          type: "string"
+        - description: "用户名"
+          in: "query"
+          name: "username"
           required: true
-          type: string
+          type: "string"
+      produces:
+        - "text/html"
+      tags:
+        - "用户"
       responses:
-        '200':
-          description: 成功返回个人资料页面
-        '401':
-          description: 无效或已过期的认证令牌
+        "200":
+          description: "成功返回个人资料页面"
+        "400":
+          description: "认证令牌和用户名不能为空"
           schema:
-            $ref: '#/definitions/APIResponse'
+            $ref: "#/definitions/APIResponse"
+        "401":
+          description: "无效或已过期的认证令牌"
+          schema:
+            $ref: "#/definitions/APIResponse"
   /register:
     get:
-      tags:
-        - 页面
-      summary: 返回用户注册页面
-      operationId: registerPage
+      description: "返回用户注册页面"
+      operationId: "registerPage"
       produces:
-        - text/html
+        - "text/html"
+      tags:
+        - "页面"
       responses:
-        '200':
-          description: 成功返回注册页面
+        "200":
+          description: "成功返回注册页面"
     post:
-      tags:
-        - 用户
-      summary: 注册新用户
-      operationId: registerUser
       consumes:
-        - application/x-www-form-urlencoded
-      produces:
-        - application/json
+        - "application/x-www-form-urlencoded"
+      description: "注册新用户"
+      operationId: "registerUser"
       parameters:
-        - name: username
-          in: formData
-          description: 用户名
+        - description: "用户名"
+          in: "formData"
+          name: "username"
           required: true
-          type: string
-        - name: password
-          in: formData
-          description: 密码
+          type: "string"
+        - description: "密码"
+          in: "formData"
+          name: "password"
           required: true
-          type: string
-        - name: name
-          in: formData
-          description: 姓名
+          type: "string"
+        - description: "姓名"
+          in: "formData"
+          name: "name"
           required: true
-          type: string
+          type: "string"
+      produces:
+        - "application/json"
+      tags:
+        - "用户"
       responses:
-        '202':
-          description: 注册成功
+        "202":
+          description: "注册成功"
           schema:
-            $ref: '#/definitions/APIResponse'
-        '400':
-          description: 用户已存在
+            $ref: "#/definitions/APIResponse"
+        "400":
+          description: "用户已存在或信息为空"
           schema:
-            $ref: '#/definitions/APIResponse'
-        '500':
-          description: 服务器内部错误
+            $ref: "#/definitions/APIResponse"
+        "500":
+          description: "服务器内部错误"
           schema:
-            $ref: '#/definitions/APIResponse'
+            $ref: "#/definitions/APIResponse"
   /swagger.json:
     get:
-      tags:
-        - 文档
-      summary: 返回 Swagger JSON 格式的 API 文档
-      operationId: getSwaggerJSON
+      description: "返回 Swagger JSON 格式的 API 文档"
+      operationId: "getSwaggerJSON"
       produces:
-        - application/json
+        - "application/json"
+      tags:
+        - "文档"
       responses:
-        '200':
-          description: 成功返回 Swagger JSON 文档
+        "200":
+          description: "成功返回 Swagger JSON 文档"
   /userdata:
     get:
-      tags:
-        - 用户
-      summary: 管理员查看所有用户数据
-      operationId: getUserData
-      produces:
-        - application/json
+      description: "管理员查看所有用户数据"
+      operationId: "getUserData"
       parameters:
-        - name: username
-          in: query
-          description: 用户名（必须为admin）
+        - description: "用户名（必须为admin）"
+          in: "query"
+          name: "username"
           required: true
-          type: string
-        - name: token
-          in: query
-          description: JWT认证令牌
+          type: "string"
+        - description: "JWT认证令牌"
+          in: "query"
+          name: "token"
           required: true
-          type: string
+          type: "string"
+      produces:
+        - "application/json"
+      tags:
+        - "用户"
       responses:
-        '200':
-          description: 成功返回用户数据
+        "200":
+          description: "成功返回用户数据"
           schema:
-            type: object
+            type: "object"
             properties:
               users:
-                type: object
-                description: 用户数据映射
+                type: "object"
+                description: "用户数据映射"
               count:
-                type: integer
-                description: 用户数量
-        '403':
-          description: 权限不足或token失效
+                type: "integer"
+                description: "用户数量"
+        "400":
+          description: "用户名和认证令牌不能为空"
           schema:
-            $ref: '#/definitions/APIResponse'
-securityDefinitions:
-  JWT:
-    type: apiKey
-    name: Authorization
-    in: header
-    description: JWT认证令牌，格式为"Bearer {token}"
+            $ref: "#/definitions/APIResponse"
+        "403":
+          description: "权限不足或token失效"
+          schema:
+            $ref: "#/definitions/APIResponse"
 definitions:
-  APIResponse:
-    type: object
-    properties:
-      message:
-        type: string
-        description: 消息
-      error:
-        type: string
-        description: 错误信息
-      data:
-        type: object
-        description: 用户数据
   User:
-    type: object
+    type: "object"
     required:
-      - username
-      - password
-      - name
+      - "username"
+      - "password"
+      - "name"
     properties:
       username:
-        type: string
-        description: 用户名
+        type: "string"
         example: "john_doe"
       password:
-        type: string
-        description: 密码
+        type: "string"
         example: "password123"
       name:
-        type: string
-        description: 姓名
+        type: "string"
         example: "John Doe"
   LoginRequest:
-    type: object
+    type: "object"
     required:
-      - username
-      - password
+      - "username"
+      - "password"
     properties:
       username:
-        type: string
-        description: 用户名
+        type: "string"
         example: "john_doe"
       password:
-        type: string
-        description: 密码
+        type: "string"
         example: "password123"
   RegisterRequest:
-    type: object
+    type: "object"
     required:
-      - username
-      - password
-      - name
+      - "username"
+      - "password"
+      - "name"
     properties:
       username:
-        type: string
-        description: 用户名
+        type: "string"
         example: "john_doe"
       password:
-        type: string
-        description: 密码
+        type: "string"
         example: "password123"
       name:
-        type: string
-        description: 姓名
+        type: "string"
         example: "John Doe"
   ChangePasswordRequest:
-    type: object
+    type: "object"
     required:
-      - username
-      - oldpassword
-      - password
-      - password1
+      - "username"
+      - "oldpassword"
+      - "password"
+      - "password1"
     properties:
       username:
-        type: string
-        description: 用户名
+        type: "string"
         example: "john_doe"
       oldpassword:
-        type: string
-        description: 原密码
+        type: "string"
         example: "oldpassword123"
       password:
-        type: string
-        description: 新密码
+        type: "string"
         example: "newpassword123"
       password1:
-        type: string
-        description: 确认新密码
+        type: "string"
         example: "newpassword123"
   ChangeProfileRequest:
-    type: object
+    type: "object"
     required:
-      - username
+      - "username"
     properties:
       username:
-        type: string
-        description: 原用户名
+        type: "string"
         example: "john_doe"
       newusername:
-        type: string
-        description: 新用户名
+        type: "string"
         example: "john_new"
       newname:
-        type: string
-        description: 新姓名
+        type: "string"
         example: "John New"
+  APIResponse:
+    type: "object"
+    properties:
+      message:
+        type: "string"
+      error:
+        type: "string"
+      data:
+        type: "object"
+securityDefinitions:
+  JWT:
+    type: "apiKey"
+    name: "Authorization"
+    in: "header"
+    description: "JWT认证令牌，格式为\"Bearer {token}\""

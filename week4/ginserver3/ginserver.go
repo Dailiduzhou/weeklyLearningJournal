@@ -42,19 +42,22 @@ import (
 // User 表示系统用户
 // swagger:model User
 type User struct {
+	// 用户ID，唯一标识
+	// Example: "1"
+	ID string `json:"id,omitempty"`
 	// 用户名，唯一标识
 	// Example: "john_doe"
 	Username string `json:"username"`
 	// 密码（bcrypt加密存储）
 	// Example: "$2a$10$xyz..."
-	Password string `json:"password"`
+	Password string `json:"password,omitempty"`
 	// 用户真实姓名
 	// Example: "张三"
 	Name string `json:"name"`
 }
 
 // RegisterRequest 注册请求
-// swagger:parameters registerUser
+// swagger:parameters createUser
 type RegisterRequest struct {
 	// in:body
 	Body struct {
@@ -90,7 +93,7 @@ type LoginRequest struct {
 }
 
 // ChangePasswordRequest 修改密码请求
-// swagger:parameters changePassword
+// swagger:parameters changeUserPassword
 type ChangePasswordRequest struct {
 	// in:body
 	Body struct {
@@ -109,17 +112,17 @@ type ChangePasswordRequest struct {
 	} `json:"body"`
 }
 
-// ChangeProfileRequest 修改资料请求
-// swagger:parameters changeProfile
-type ChangeProfileRequest struct {
+// UpdateProfileRequest 更新资料请求
+// swagger:parameters updateUserProfile
+type UpdateProfileRequest struct {
 	// in:body
 	Body struct {
 		// 新用户名，可选
 		// Example: "new_john_doe"
-		NewUsername string `json:"newusername" form:"newusername"`
+		Username string `json:"username,omitempty" form:"username"`
 		// 新姓名，可选
 		// Example: "李四"
-		NewName string `json:"newname" form:"newname"`
+		Name string `json:"name,omitempty" form:"name"`
 	} `json:"body"`
 }
 
@@ -128,11 +131,18 @@ type ChangeProfileRequest struct {
 type UserListResponse struct {
 	// in:body
 	Body struct {
-		// 用户数据映射
-		Users map[string]gin.H `json:"users"`
+		// 用户数据列表
+		Users []User `json:"users"`
 		// 用户数量
 		Count int `json:"count"`
 	} `json:"body"`
+}
+
+// UserResponse 单个用户响应
+// swagger:response userResponse
+type UserResponse struct {
+	// in:body
+	Body User `json:"body"`
 }
 
 // SuccessResponse 通用成功响应
@@ -219,20 +229,29 @@ func registerRoutes(r *gin.Engine) {
 	r.GET("/docs", swaggerUIHandler)
 	r.GET("/docs/*any", swaggerUIHandler)
 
-	// 页面路由
-	r.GET("/register", registerHandler)
+	// 认证路由
 	r.GET("/login", loginHandler)
-	r.GET("/profiles", profilesHandler)
-	r.GET("/changepassword", changePasswordHandler)
-	r.GET("/changeprofiles", changeprofileHandler)
+	r.POST("/api/auth/login", loginAPIHandler)
+	r.POST("/api/auth/logout", logoutAPIHandler)
 
-	// 功能路由
-	r.POST("/register", registerHandler1)
-	r.POST("/login", loginHandler1)
-	r.POST("/changepassword", changepasswordhandler1)
-	r.POST("/changeprofiles", changeprofileHandler1)
-	r.GET("/userdata", viewUserdataHandler)
-	r.GET("/logout", logoutHandler)
+	// 用户注册页面和API
+	r.GET("/register", registerHandler)
+	r.POST("/api/users", registerAPIHandler)
+
+	// 当前用户相关路由
+	r.GET("/profiles", profilePageHandler)
+	r.GET("/api/users/me", getCurrentUserHandler)
+	r.PUT("/api/users/me", updateUserProfileHandler)
+	r.PUT("/api/users/me/password", changePasswordHandler)
+
+	// 管理路由
+	r.GET("/admin/users", adminUserListPageHandler)
+	r.GET("/api/users", listUsersHandler)
+
+	// 兼容旧路由（可选）
+	r.GET("/userdata", func(c *gin.Context) {
+		c.Redirect(http.StatusMovedPermanently, "/api/users")
+	})
 }
 
 // swaggerJSONHandler 返回Swagger JSON文档
@@ -331,8 +350,8 @@ func registerHandler(c *gin.Context) {
 	})
 }
 
-// registerHandler1 处理用户注册请求
-// @Summary 用户注册
+// registerAPIHandler 处理用户注册请求 (RESTful API)
+// @Summary 创建新用户
 // @Description 创建新用户账户
 // @Tags 用户
 // @Accept application/x-www-form-urlencoded
@@ -340,11 +359,11 @@ func registerHandler(c *gin.Context) {
 // @Param username formData string true "用户名" minLength(3) maxLength(20)
 // @Param password formData string true "密码" minLength(6)
 // @Param name formData string true "姓名" minLength(1) maxLength(50)
-// @Success 202 {object} successResponse
-// @Failure 400 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Router /register [post]
-func registerHandler1(c *gin.Context) {
+// @Success 201 {object} userResponse "用户创建成功"
+// @Failure 400 {object} errorResponse "用户名、密码和姓名不能为空或用户名已存在"
+// @Failure 500 {object} errorResponse "用户数据保存失败或密码加密失败"
+// @Router /api/users [post]
+func registerAPIHandler(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 	name := c.PostForm("name")
@@ -403,8 +422,10 @@ func registerHandler1(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusAccepted, gin.H{
-		"message": "注册成功，请登录",
+	// 返回创建的用户信息（不包含密码）
+	c.JSON(http.StatusCreated, gin.H{
+		"username": newUser.Username,
+		"name":     newUser.Name,
 	})
 }
 
@@ -421,19 +442,19 @@ func loginHandler(c *gin.Context) {
 	})
 }
 
-// loginHandler1 处理用户登录请求
+// loginAPIHandler 处理用户登录请求 (RESTful API)
 // @Summary 用户登录
 // @Description 验证用户凭证并创建会话
-// @Tags 用户
+// @Tags 认证
 // @Accept application/x-www-form-urlencoded
 // @Produce json
 // @Param username formData string true "用户名"
 // @Param password formData string true "密码"
-// @Success 302 "登录成功，重定向到个人资料页"
-// @Failure 400 {object} errorResponse
-// @Failure 403 {object} errorResponse
-// @Router /login [post]
-func loginHandler1(c *gin.Context) {
+// @Success 200 {object} userResponse "登录成功，返回用户信息"
+// @Failure 400 {object} errorResponse "用户名和密码不能为空"
+// @Failure 403 {object} errorResponse "密码错误"
+// @Router /api/auth/login [post]
+func loginAPIHandler(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 
@@ -473,18 +494,22 @@ func loginHandler1(c *gin.Context) {
 		return
 	}
 
-	c.Redirect(http.StatusFound, "/profiles")
+	// 返回用户信息（不包含密码）
+	c.JSON(http.StatusOK, gin.H{
+		"username": user.Username,
+		"name":     user.Name,
+	})
 }
 
-// profilesHandler 返回用户个人资料页面
+// profilePageHandler 返回用户个人资料页面
 // @Summary 个人资料页面
 // @Description 显示当前登录用户的个人资料
 // @Tags 页面
 // @Produce html
 // @Success 200 {string} string "个人资料页面HTML"
-// @Failure 302 "未登录，重定向到登录页"
+// @Failure 302 {string} string "未登录，重定向到登录页"
 // @Router /profiles [get]
-func profilesHandler(c *gin.Context) {
+func profilePageHandler(c *gin.Context) {
 	session := sessions.Default(c)
 	username := session.Get("username")
 
@@ -510,21 +535,46 @@ func profilesHandler(c *gin.Context) {
 	})
 }
 
-// changePasswordHandler 返回修改密码页面
-// @Summary 修改密码页面
-// @Description 返回修改密码表单页面
-// @Tags 页面
-// @Produce html
-// @Success 200 {string} string "修改密码页面HTML"
-// @Router /changepassword [get]
-func changePasswordHandler(c *gin.Context) {
-	c.HTML(http.StatusOK, "changepassword.html", gin.H{
-		"title": "修改密码",
+// getCurrentUserHandler 获取当前登录用户信息 (RESTful API)
+// @Summary 获取当前用户信息
+// @Description 获取当前登录用户的详细信息
+// @Tags 用户
+// @Produce json
+// @Security sessionAuth
+// @Success 200 {object} userResponse "返回当前用户信息"
+// @Failure 401 {object} errorResponse "未认证"
+// @Router /api/users/me [get]
+func getCurrentUserHandler(c *gin.Context) {
+	session := sessions.Default(c)
+	username := session.Get("username")
+
+	if username == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "未认证，请先登录",
+		})
+		return
+	}
+
+	mutex.RLock()
+	user, exists := userStore[username.(string)]
+	mutex.RUnlock()
+
+	if !exists {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "用户不存在",
+		})
+		return
+	}
+
+	// 返回用户信息（不包含密码）
+	c.JSON(http.StatusOK, gin.H{
+		"username": user.Username,
+		"name":     user.Name,
 	})
 }
 
-// changepasswordhandler1 处理修改密码请求
-// @Summary 修改密码
+// changePasswordHandler 修改当前用户密码 (RESTful API)
+// @Summary 修改当前用户密码
 // @Description 修改当前登录用户的密码
 // @Tags 用户
 // @Accept application/x-www-form-urlencoded
@@ -532,16 +582,20 @@ func changePasswordHandler(c *gin.Context) {
 // @Param oldpassword formData string true "原密码"
 // @Param password formData string true "新密码"
 // @Param password1 formData string true "确认新密码"
-// @Success 200 {object} successResponse
-// @Failure 400 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Router /changepassword [post]
-func changepasswordhandler1(c *gin.Context) {
+// @Security sessionAuth
+// @Success 200 {object} successResponse "密码修改成功"
+// @Failure 400 {object} errorResponse "所有密码字段不能为空或原密码错误或两次输入的新密码不一致或用户不存在"
+// @Failure 401 {object} errorResponse "未认证"
+// @Failure 500 {object} errorResponse "密码加密失败或密码更新失败"
+// @Router /api/users/me/password [put]
+func changePasswordHandler(c *gin.Context) {
 	session := sessions.Default(c)
 	username := session.Get("username")
 
 	if username == nil {
-		c.Redirect(http.StatusFound, "/login")
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "未认证，请先登录",
+		})
 		return
 	}
 
@@ -562,33 +616,24 @@ func changepasswordhandler1(c *gin.Context) {
 	mutex.RUnlock()
 
 	if !exists {
-		c.HTML(http.StatusBadRequest, "error.html", gin.H{
-			"Message":      "用户不存在",
-			"RedirectURL":  "/changepassword",
-			"RedirectName": "修改密码页面",
-			"Delay":        1000,
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "用户不存在",
 		})
 		return
 	}
 
 	// 验证原密码
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldpassword)); err != nil {
-		c.HTML(http.StatusBadRequest, "error.html", gin.H{
-			"Message":      "原密码错误",
-			"RedirectURL":  "/changepassword",
-			"RedirectName": "修改密码页面",
-			"Delay":        1000,
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "原密码错误",
 		})
 		return
 	}
 
 	// 验证新密码一致性
 	if password != password1 {
-		c.HTML(http.StatusBadRequest, "error.html", gin.H{
-			"Message":      "两次输入的新密码不一致",
-			"RedirectURL":  "/changepassword",
-			"RedirectName": "修改密码页面",
-			"Delay":        1000,
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "两次输入的新密码不一致",
 		})
 		return
 	}
@@ -620,71 +665,54 @@ func changepasswordhandler1(c *gin.Context) {
 	})
 }
 
-// changeprofileHandler 返回修改资料页面
-// @Summary 修改资料页面
-// @Description 返回修改用户资料表单页面
-// @Tags 页面
-// @Produce html
-// @Success 200 {string} string "修改资料页面HTML"
-// @Router /changeprofiles [get]
-func changeprofileHandler(c *gin.Context) {
-	session := sessions.Default(c)
-	username := session.Get("username")
-
-	if username == nil {
-		c.Redirect(http.StatusFound, "/login")
-		return
-	}
-
-	c.HTML(http.StatusOK, "changeprofiles.html", gin.H{
-		"username": username,
-	})
-}
-
-// changeprofileHandler1 处理修改资料请求
-// @Summary 修改用户资料
-// @Description 修改当前登录用户的用户名和姓名
+// updateUserProfileHandler 更新当前用户资料 (RESTful API)
+// @Summary 更新当前用户资料
+// @Description 更新当前登录用户的用户名和姓名
 // @Tags 用户
 // @Accept application/x-www-form-urlencoded
 // @Produce json
-// @Param newusername formData string false "新用户名"
-// @Param newname formData string false "新姓名"
-// @Success 200 {object} successResponse
-// @Failure 400 {object} errorResponse
-// @Failure 500 {object} errorResponse
-// @Router /changeprofiles [post]
-func changeprofileHandler1(c *gin.Context) {
+// @Param username formData string false "新用户名"
+// @Param name formData string false "新姓名"
+// @Security sessionAuth
+// @Success 200 {object} userResponse "资料修改成功，返回更新后的用户信息"
+// @Failure 400 {object} errorResponse "未检测到有效更改或新用户名与原用户名相同或新姓名与原姓名相同"
+// @Failure 401 {object} errorResponse "未认证"
+// @Failure 500 {object} errorResponse "资料更新失败"
+// @Router /api/users/me [put]
+func updateUserProfileHandler(c *gin.Context) {
 	session := sessions.Default(c)
 	username := session.Get("username")
 
 	if username == nil {
-		c.Redirect(http.StatusFound, "/login")
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "未认证，请先登录",
+		})
 		return
 	}
 
-	newusername := c.PostForm("newusername")
-	newname := c.PostForm("newname")
+	newUsername := c.PostForm("username")
+	newName := c.PostForm("name")
 
 	mutex.RLock()
 	user := userStore[username.(string)]
 	mutex.RUnlock()
 
 	// 检查是否有有效更改
-	if newname == "" && newusername == "" {
+	if newName == "" && newUsername == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
-			"message": "未检测到有效更改",
+			"error": "未检测到有效更改",
 		})
 		return
 	}
 
-	if newusername == user.Username {
+	if newUsername != "" && newUsername == user.Username {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "新用户名与原用户名相同",
 		})
 		return
 	}
 
-	if newname == user.Name {
+	if newName != "" && newName == user.Name {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "新姓名与原姓名相同",
 		})
@@ -692,20 +720,31 @@ func changeprofileHandler1(c *gin.Context) {
 	}
 
 	// 更新用户名
-	if newusername != "" {
+	if newUsername != "" {
 		mutex.Lock()
-		userStore[username.(string)].Username = newusername
+		// 检查新用户名是否已存在
+		if _, exists := userStore[newUsername]; exists {
+			mutex.Unlock()
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "新用户名已存在",
+			})
+			return
+		}
+		oldUsername := user.Username
+		userStore[newUsername] = userStore[oldUsername]
+		userStore[newUsername].Username = newUsername
+		delete(userStore, oldUsername)
 		mutex.Unlock()
 
 		// 更新会话
-		session.Set("username", newusername)
+		session.Set("username", newUsername)
 		session.Save()
 	}
 
 	// 更新姓名
-	if newname != "" {
+	if newName != "" {
 		mutex.Lock()
-		userStore[username.(string)].Name = newname
+		userStore[username.(string)].Name = newName
 		mutex.Unlock()
 	}
 
@@ -717,25 +756,87 @@ func changeprofileHandler1(c *gin.Context) {
 		return
 	}
 
+	// 获取更新后的用户
+	var updatedUser *User
+	if newUsername != "" {
+		mutex.RLock()
+		updatedUser = userStore[newUsername]
+		mutex.RUnlock()
+	} else {
+		mutex.RLock()
+		updatedUser = userStore[username.(string)]
+		mutex.RUnlock()
+	}
+
+	// 返回更新后的用户信息
 	c.JSON(http.StatusOK, gin.H{
-		"message": "资料修改成功",
+		"username": updatedUser.Username,
+		"name":     updatedUser.Name,
 	})
 }
 
-// viewUserdataHandler 查看所有用户数据（管理员功能）
-// @Summary 查看用户数据
-// @Description 管理员查看所有注册用户的数据
+// adminUserListPageHandler 返回管理员用户列表页面
+// @Summary 管理员用户列表页面
+// @Description 返回管理员查看用户列表的页面
 // @Tags 管理
-// @Produce json
-// @Success 200 {object} userListResponse
-// @Failure 403 {object} errorResponse
-// @Router /userdata [get]
-func viewUserdataHandler(c *gin.Context) {
+// @Produce html
+// @Success 200 {string} string "管理员用户列表页面HTML"
+// @Failure 302 {string} string "未登录或非管理员，重定向到登录页"
+// @Router /admin/users [get]
+func adminUserListPageHandler(c *gin.Context) {
 	session := sessions.Default(c)
 	username := session.Get("username")
 
+	if username == nil {
+		c.Redirect(http.StatusFound, "/login")
+		return
+	}
+
+	if username.(string) != "admin" {
+		c.HTML(http.StatusForbidden, "error.html", gin.H{
+			"Message":      "权限不足，需要管理员权限",
+			"RedirectURL":  "/profiles",
+			"RedirectName": "个人资料页",
+			"Delay":        3000,
+		})
+		return
+	}
+
+	mutex.RLock()
+	users := make([]User, 0, len(userStore))
+	for _, user := range userStore {
+		users = append(users, *user)
+	}
+	mutex.RUnlock()
+
+	c.HTML(http.StatusOK, "admin_users.html", gin.H{
+		"users": users,
+	})
+}
+
+// listUsersHandler 获取所有用户列表 (RESTful API)
+// @Summary 获取所有用户列表
+// @Description 管理员获取所有注册用户的数据
+// @Tags 管理
+// @Produce json
+// @Security sessionAuth
+// @Success 200 {object} userListResponse "返回所有用户数据"
+// @Failure 401 {object} errorResponse "未认证"
+// @Failure 403 {object} errorResponse "权限不足，需要管理员权限"
+// @Router /api/users [get]
+func listUsersHandler(c *gin.Context) {
+	session := sessions.Default(c)
+	username := session.Get("username")
+
+	if username == nil {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "未认证，请先登录",
+		})
+		return
+	}
+
 	// 权限检查
-	if username == nil || username.(string) != "admin" {
+	if username.(string) != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{
 			"error": "权限不足，需要管理员权限",
 		})
@@ -743,33 +844,35 @@ func viewUserdataHandler(c *gin.Context) {
 	}
 
 	mutex.RLock()
-	usersData := make(map[string]gin.H)
-	for username, user := range userStore {
-		usersData[username] = gin.H{
-			"Username": user.Username,
-			"Name":     user.Name,
-			"Password": user.Password,
-		}
+	users := make([]User, 0, len(userStore))
+	for _, user := range userStore {
+		// 创建不包含密码的用户副本
+		users = append(users, User{
+			Username: user.Username,
+			Name:     user.Name,
+		})
 	}
 	mutex.RUnlock()
 
 	c.JSON(http.StatusOK, gin.H{
-		"users": usersData,
-		"count": len(usersData),
+		"users": users,
+		"count": len(users),
 	})
 }
 
-// logoutHandler 处理用户登出
+// logoutAPIHandler 处理用户登出 (RESTful API)
 // @Summary 用户登出
-// @Description 清除用户会话并重定向到登录页面
-// @Tags 用户
-// @Success 302 "登出成功，重定向到登录页"
-// @Router /logout [get]
-func logoutHandler(c *gin.Context) {
+// @Description 清除用户会话
+// @Tags 认证
+// @Success 200 {object} successResponse "登出成功"
+// @Router /api/auth/logout [post]
+func logoutAPIHandler(c *gin.Context) {
 	session := sessions.Default(c)
 	session.Clear()
 	session.Save()
-	c.Redirect(http.StatusFound, "/login")
+	c.JSON(http.StatusOK, gin.H{
+		"message": "登出成功",
+	})
 }
 
 // loadFiles 从文件加载用户数据

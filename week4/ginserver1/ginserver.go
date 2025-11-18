@@ -198,7 +198,6 @@ func main() {
 	r.Run(":8080")
 }
 
-// swaggerJSONHandler 返回 Swagger JSON 文档
 // swagger:operation GET /swagger.json 文档 getSwaggerJSON
 //
 // 返回 Swagger JSON 格式的 API 文档
@@ -213,13 +212,9 @@ func main() {
 //	  schema:
 //	    type: object
 func swaggerJSONHandler(c *gin.Context) {
-	// 这里可以动态生成或读取静态文件
-	// 为了简单起见，我们使用 go-swagger 生成静态文件
-	// 你需要先运行: swagger generate spec -o ./swagger.json
 	c.File("./swagger.json")
 }
 
-// swaggerUIHandler 返回 Swagger UI 界面
 // swagger:operation GET /docs 文档 getSwaggerUI
 //
 // 返回 Swagger UI 界面
@@ -295,7 +290,6 @@ func swaggerUIHandler(c *gin.Context) {
 	c.String(200, swaggerUIHTML)
 }
 
-// registerHandler 显示注册页面
 // swagger:operation GET /register 页面 registerPage
 //
 // 返回用户注册页面
@@ -315,7 +309,6 @@ func registerHandler(c *gin.Context) {
 	})
 }
 
-// registerHandler1 用户注册
 // swagger:operation POST /register 用户 registerUser
 //
 // 注册新用户
@@ -349,7 +342,7 @@ func registerHandler(c *gin.Context) {
 //	  schema:
 //	    $ref: '#/definitions/APIResponse'
 //	'400':
-//	  description: 用户已存在
+//	  description: 用户已存在或信息为空
 //	  schema:
 //	    $ref: '#/definitions/APIResponse'
 //	'500':
@@ -360,6 +353,14 @@ func registerHandler1(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
 	name := c.PostForm("name")
+
+	// 检查参数是否为空
+	if username == "" || password == "" || name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "信息不能为空",
+		})
+		return
+	}
 
 	mutex.RLock()
 	_, exists := userStore[username]
@@ -403,7 +404,6 @@ func registerHandler1(c *gin.Context) {
 	})
 }
 
-// loginHandler 显示登录页面
 // swagger:operation GET /login 页面 loginPage
 //
 // 返回用户登录页面
@@ -423,7 +423,6 @@ func loginHandler(c *gin.Context) {
 	})
 }
 
-// loginHandler1 用户登录
 // swagger:operation POST /login 用户 loginUser
 //
 // 用户登录并返回JWT令牌
@@ -450,7 +449,7 @@ func loginHandler(c *gin.Context) {
 //	'302':
 //	  description: 登录成功，重定向到个人资料页面
 //	'400':
-//	  description: 用户不存在
+//	  description: 用户不存在或信息为空
 //	  schema:
 //	    $ref: '#/definitions/APIResponse'
 //	'403':
@@ -464,6 +463,14 @@ func loginHandler(c *gin.Context) {
 func loginHandler1(c *gin.Context) {
 	username := c.PostForm("username")
 	password := c.PostForm("password")
+
+	// 检查参数是否为空
+	if username == "" || password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "信息不能为空",
+		})
+		return
+	}
 
 	mutex.RLock()
 	_, exists := userStore[username]
@@ -507,7 +514,6 @@ func loginHandler1(c *gin.Context) {
 	c.Redirect(http.StatusFound, redirectURL)
 }
 
-// profilesHandler 显示个人资料页面
 // swagger:operation GET /profiles 用户 getProfile
 //
 // 返回用户个人资料页面
@@ -533,6 +539,10 @@ func loginHandler1(c *gin.Context) {
 //	  description: 成功返回个人资料页面
 //	  schema:
 //	    type: string
+//	'400':
+//	  description: 认证令牌和用户名不能为空
+//	  schema:
+//	    $ref: '#/definitions/APIResponse'
 //	'401':
 //	  description: 无效或已过期的认证令牌
 //	  schema:
@@ -540,6 +550,15 @@ func loginHandler1(c *gin.Context) {
 func profilesHandler(c *gin.Context) {
 	tokenString := c.Query("token")
 	username := c.Query("username")
+
+	// 检查参数是否为空
+	if tokenString == "" || username == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "认证令牌和用户名不能为空",
+		})
+		return
+	}
+
 	if !jwtValidator(c, tokenString) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "无效或已过期的认证令牌"})
 		return
@@ -547,13 +566,13 @@ func profilesHandler(c *gin.Context) {
 
 	mutex.RLock()
 	c.HTML(http.StatusOK, "profiles.html", gin.H{
-		"username": userStore[username].Username,
-		"name":     userStore[username].Name,
+		"username":    userStore[username].Username,
+		"name":        userStore[username].Name,
+		"tokenString": tokenString,
 	})
 	mutex.RUnlock()
 }
 
-// changePasswordHandler 显示修改密码页面
 // swagger:operation GET /changepassword 页面 changePasswordPage
 //
 // 返回修改密码页面
@@ -573,7 +592,6 @@ func changePasswordHandler(c *gin.Context) {
 	})
 }
 
-// changepasswordhandler1 修改密码
 // swagger:operation POST /changepassword 用户 changePassword
 //
 // 修改用户密码
@@ -611,9 +629,9 @@ func changePasswordHandler(c *gin.Context) {
 //	'200':
 //	  description: 密码修改成功
 //	  schema:
-//	    type: string
+//	    $ref: '#/definitions/APIResponse'
 //	'400':
-//	  description: 用户不存在或两次密码不一致
+//	  description: 用户不存在或两次密码不一致或信息为空
 //	  schema:
 //	    $ref: '#/definitions/APIResponse'
 //	'403':
@@ -630,37 +648,36 @@ func changepasswordhandler1(c *gin.Context) {
 	password := c.PostForm("password")
 	password1 := c.PostForm("password1")
 
+	// 检查参数是否为空
+	if username == "" || password == "" || oldpassword == "" || password1 == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "信息不能为空",
+		})
+		return
+	}
+
 	mutex.RLock()
 	user, exists := userStore[username]
 	mutex.RUnlock()
 
 	if !exists {
-		c.HTML(http.StatusBadRequest, "error.html", gin.H{
-			"Message":      "用户不存在",
-			"RedirectURL":  "/changepassword",
-			"RedirectName": "修改密码页面",
-			"Delay":        1000,
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "用户不存在",
 		})
 		return
 	}
 
 	err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(oldpassword))
 	if err != nil {
-		c.HTML(http.StatusBadRequest, "error.html", gin.H{
-			"Message":      "原密码错误",
-			"RedirectURL":  "/changepassword",
-			"RedirectName": "修改密码页面",
-			"Delay":        1000,
+		c.JSON(http.StatusForbidden, gin.H{
+			"error": "原密码错误",
 		})
 		return
 	}
 
 	if password != password1 {
-		c.HTML(http.StatusBadRequest, "error.html", gin.H{
-			"Message":      "两次密码输入不一致",
-			"RedirectURL":  "/changepassword",
-			"RedirectName": "修改密码页面",
-			"Delay":        1000,
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "两次密码输入不一致",
 		})
 		return
 	}
@@ -690,7 +707,6 @@ func changepasswordhandler1(c *gin.Context) {
 	})
 }
 
-// changeprofileHandler 显示修改个人信息页面
 // swagger:operation GET /changeprofiles 页面 changeProfilePage
 //
 // 返回修改个人信息页面
@@ -716,6 +732,10 @@ func changepasswordhandler1(c *gin.Context) {
 //	  description: 成功返回修改个人信息页面
 //	  schema:
 //	    type: string
+//	'400':
+//	  description: 认证令牌和用户名不能为空
+//	  schema:
+//	    $ref: '#/definitions/APIResponse'
 //	'401':
 //	  description: 无效或已过期的认证令牌
 //	  schema:
@@ -723,6 +743,14 @@ func changepasswordhandler1(c *gin.Context) {
 func changeprofileHandler(c *gin.Context) {
 	tokenString := c.Query("token")
 	username := c.Query("username")
+
+	// 检查参数是否为空
+	if tokenString == "" || username == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "认证令牌和用户名不能为空",
+		})
+		return
+	}
 
 	if !jwtValidator(c, tokenString) {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "无效或已过期的认证令牌"})
@@ -734,7 +762,6 @@ func changeprofileHandler(c *gin.Context) {
 	})
 }
 
-// changeprofileHandler1 修改个人信息
 // swagger:operation POST /changeprofiles 用户 changeProfile
 //
 // 修改用户个人信息
@@ -766,7 +793,7 @@ func changeprofileHandler(c *gin.Context) {
 //	  schema:
 //	    $ref: '#/definitions/APIResponse'
 //	'400':
-//	  description: 未发生更改或用户名/姓名与原值相同
+//	  description: 未发生更改或用户名/姓名与原值相同或信息为空
 //	  schema:
 //	    $ref: '#/definitions/APIResponse'
 //	'500':
@@ -778,9 +805,24 @@ func changeprofileHandler1(c *gin.Context) {
 	newname := c.PostForm("newname")
 	username := c.PostForm("username")
 
+	// 检查参数是否为空
+	if username == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "用户名不能为空",
+		})
+		return
+	}
+
 	mutex.RLock()
-	user := userStore[username]
+	user, exists := userStore[username]
 	mutex.RUnlock()
+
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "用户不存在",
+		})
+		return
+	}
 
 	if newname == "" && newusername == "" {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -829,7 +871,6 @@ func changeprofileHandler1(c *gin.Context) {
 	})
 }
 
-// viewUserdataHandler 查看所有用户数据（管理员功能）
 // swagger:operation GET /userdata 用户 getUserData
 //
 // 管理员查看所有用户数据
@@ -862,6 +903,10 @@ func changeprofileHandler1(c *gin.Context) {
 //	      count:
 //	        type: integer
 //	        description: 用户数量
+//	'400':
+//	  description: 用户名和认证令牌不能为空
+//	  schema:
+//	    $ref: '#/definitions/APIResponse'
 //	'403':
 //	  description: 权限不足或token失效
 //	  schema:
@@ -869,6 +914,14 @@ func changeprofileHandler1(c *gin.Context) {
 func viewUserdataHandler(c *gin.Context) {
 	username := c.Query("username")
 	tokenString := c.Query("token")
+
+	// 检查参数是否为空
+	if username == "" || tokenString == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "用户名和认证令牌不能为空",
+		})
+		return
+	}
 
 	if username != "admin" {
 		c.JSON(http.StatusForbidden, gin.H{

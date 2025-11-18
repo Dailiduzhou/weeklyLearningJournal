@@ -1,0 +1,90 @@
+{
+  "consumes": [
+    "application/json",
+    "application/x-www-form-urlencoded"
+  ],
+  "produces": [
+    "application/json",
+    "text/html"
+  ],
+  "schemes": [
+    "http"
+  ],
+  "swagger": "2.0",
+  "info": {
+    "description": "这是一个基于Gin框架的用户管理系统API，提供用户注册、登录、个人信息管理等功能",
+    "title": "用户管理API",
+    "version": "1.0.0"
+  },
+  "host": "localhost:8080",
+  "basePath": "/",
+  "paths": {},
+  "definitions": {
+    "H": {
+      "description": "H is a shortcut for map[string]any",
+      "type": "object",
+      "additionalProperties": {},
+      "x-go-package": "github.com/gin-gonic/gin"
+    }
+  },
+  "responses": {
+    "errorResponse": {
+      "description": "ErrorResponse 通用错误响应",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "description": "错误信息",
+            "type": "string",
+            "x-go-name": "Error",
+            "example": "\"操作失败\""
+          }
+        }
+      }
+    },
+    "successResponse": {
+      "description": "SuccessResponse 通用成功响应",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "description": "响应消息",
+            "type": "string",
+            "x-go-name": "Message",
+            "example": "\"操作成功\""
+          }
+        }
+      }
+    },
+    "userListResponse": {
+      "description": "UserListResponse 用户列表响应",
+      "schema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "description": "用户数量",
+            "type": "integer",
+            "format": "int64",
+            "x-go-name": "Count"
+          },
+          "users": {
+            "description": "用户数据映射",
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/definitions/H"
+            },
+            "x-go-name": "Users"
+          }
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "sessionAuth": {
+      "description": "会话认证，基于cookie",
+      "type": "apiKey",
+      "name": "Cookie",
+      "in": "header"
+    }
+  }
+}
