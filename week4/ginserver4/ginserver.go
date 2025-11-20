@@ -1,4 +1,3 @@
-``` go
 // Package classification 用户管理API
 //
 // 这是一个基于Gin框架的用户管理系统API，提供用户注册、登录、个人信息管理等功能
@@ -153,8 +152,8 @@ type UserResponse struct {
 type SuccessResponse struct {
 	// in:body
 	Body struct {
-		 // 响应消息
-		 // Example: "操作成功"
+		// 响应消息
+		// Example: "操作成功"
 		Message string `json:"message"`
 	} `json:"body"`
 }
@@ -318,7 +317,7 @@ func saveToRedis() error {
 
 	// 检查Redis连接
 	if _, err := rdb.Ping(ctx).Result(); err != nil {
-		return fmt.Errorf("Redis不可用: %v", err)
+		return fmt.Errorf("redis不可用: %v", err)
 	}
 
 	pipe := rdb.Pipeline()
@@ -1120,4 +1119,3 @@ func changePasswordPageHandler(c *gin.Context) {
 		"title": "修改密码",
 	})
 }
-```

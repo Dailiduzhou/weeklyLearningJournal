@@ -10,3 +10,7 @@
 还没能实现控制swagger文档访问权的功能。
 ## `gin`框架
 `gin`框架整合了原生的`net/http`包，对路由的操作变得简单、方便。显示`json`、`HTML`，提取表单元素也变得轻松。
+
+## `Redis`
+使用了go-redis/redis，实现用户信息，成结构信息的存储。
+`StringCmd.Result()`的返回值类型是`(string, error)`，在实际开发中，更实用。

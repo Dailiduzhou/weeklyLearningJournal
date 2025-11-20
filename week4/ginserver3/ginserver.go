@@ -244,6 +244,9 @@ func registerRoutes(r *gin.Engine) {
 	r.PUT("/api/users/me", updateUserProfileHandler)
 	r.PUT("/api/users/me/password", changePasswordHandler)
 
+	r.GET("/changeprofiles", changeProfilePageHandler)  // 返回修改资料页面
+	r.GET("/changepassword", changePasswordPageHandler) // 返回修改密码页面
+
 	// 管理路由
 	r.GET("/admin/users", adminUserListPageHandler)
 	r.GET("/api/users", listUsersHandler)
@@ -733,6 +736,7 @@ func updateUserProfileHandler(c *gin.Context) {
 		oldUsername := user.Username
 		userStore[newUsername] = userStore[oldUsername]
 		userStore[newUsername].Username = newUsername
+		userStore[newUsername].Name = newName
 		delete(userStore, oldUsername)
 		mutex.Unlock()
 
@@ -803,14 +807,19 @@ func adminUserListPageHandler(c *gin.Context) {
 	}
 
 	mutex.RLock()
-	users := make([]User, 0, len(userStore))
-	for _, user := range userStore {
-		users = append(users, *user)
+	usersData := make(map[string]gin.H)
+	for username, user := range userStore {
+		usersData[username] = gin.H{
+			"Username": user.Username,
+			"Name":     user.Name,
+			"Password": user.Password,
+		}
 	}
 	mutex.RUnlock()
 
-	c.HTML(http.StatusOK, "admin_users.html", gin.H{
-		"users": users,
+	c.JSON(http.StatusOK, gin.H{
+		"users": usersData,
+		"count": len(usersData),
 	})
 }
 
@@ -944,4 +953,48 @@ func saveUserstoFiles() error {
 	}
 
 	return nil
+}
+
+// changeProfilePageHandler 返回修改资料页面
+// @Summary 修改资料页面
+// @Description 返回修改用户资料表单页面
+// @Tags 页面
+// @Produce html
+// @Success 200 {string} string "修改资料页面HTML"
+// @Failure 302 {string} string "未登录，重定向到登录页"
+// @Router /changeprofiles [get]
+func changeProfilePageHandler(c *gin.Context) {
+	session := sessions.Default(c)
+	username := session.Get("username")
+
+	if username == nil {
+		c.Redirect(http.StatusFound, "/login")
+		return
+	}
+
+	c.HTML(http.StatusOK, "changeprofiles.html", gin.H{
+		"username": username,
+	})
+}
+
+// changePasswordPageHandler 返回修改密码页面
+// @Summary 修改密码页面
+// @Description 返回修改密码表单页面
+// @Tags 页面
+// @Produce html
+// @Success 200 {string} string "修改密码页面HTML"
+// @Failure 302 {string} string "未登录，重定向到登录页"
+// @Router /changepassword [get]
+func changePasswordPageHandler(c *gin.Context) {
+	session := sessions.Default(c)
+	username := session.Get("username")
+
+	if username == nil {
+		c.Redirect(http.StatusFound, "/login")
+		return
+	}
+
+	c.HTML(http.StatusOK, "changepassword.html", gin.H{
+		"title": "修改密码",
+	})
 }
