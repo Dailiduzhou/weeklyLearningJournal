@@ -91,6 +91,13 @@ type RegisterRequest struct {
 	Name string `json:"name"`
 }
 
+type ProfilesRequest struct {
+	Body struct {
+		Username string `json:"username" binding:"required"`
+		Token    string `json:"token" binding:"required"`
+	} `json:"body"`
+}
+
 // ChangePasswordRequest 修改密码请求
 // swagger:model ChangePasswordRequest
 type ChangePasswordRequest struct {
@@ -187,6 +194,7 @@ func main() {
 	r.GET("/login", loginHandler)
 	r.POST("/login", loginHandler1)
 	r.GET("/profiles", profilesHandler)
+	r.POST("/profiles", profilesHandler1)
 	r.GET("/changepassword", changePasswordHandler)
 	r.POST("/changepassword", changepasswordhandler1)
 	r.GET("/changeprofiles", changeprofileHandler)
@@ -569,6 +577,50 @@ func profilesHandler(c *gin.Context) {
 		"username":    userStore[username].Username,
 		"name":        userStore[username].Name,
 		"tokenString": tokenString,
+	})
+	mutex.RUnlock()
+}
+
+func profilesHandler1(c *gin.Context) {
+	var req ProfilesRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Bad input",
+		})
+		return
+	}
+
+	if req.Body.Token == "" || req.Body.Username == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "empty info",
+		})
+		return
+	}
+
+	if !jwtValidator(c, req.Body.Token) {
+		c.JSON(http.StatusUnauthorized, gin.H{
+			"error": "无效或已过期的认证令牌",
+		})
+		return
+	}
+
+	mutex.RLock()
+	user, exists := userStore[req.Body.Username]
+	mutex.RUnlock()
+
+	if !exists {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "用户不存在",
+		})
+		return
+	}
+
+	mutex.RLock()
+	c.HTML(http.StatusOK, "profiles.html", gin.H{
+		"username":    userStore[user.Username].Username,
+		"name":        userStore[user.Username].Name,
+		"tokenString": req.Body.Token,
 	})
 	mutex.RUnlock()
 }

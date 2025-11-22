@@ -71,7 +71,7 @@ func Login(UserMessage UserMessage) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("发送请求时失败：%v", err)
 	}
-	defer response.Body.Close()
+	defer response.Body.Close() // resp.Body 是一个流stream，需要关闭来保证安全
 
 	body, err := io.ReadAll(response.Body)
 	if err != nil {

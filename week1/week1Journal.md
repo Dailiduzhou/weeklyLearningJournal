@@ -187,7 +187,8 @@ $\fbox{replace( example.com/example/package\quad=> \quad./example/package)}$
 
 另外我就阿巴阿巴，根本看不懂。
 
-<br></br>
+
+
 $\fbox{test Template}$
 ``` go
 // the way to go
