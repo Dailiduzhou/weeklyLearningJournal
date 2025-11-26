@@ -3,14 +3,32 @@ package main
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
+	"net/http/cookiejar"
+	"net/url"
+	"os"
 	"strings"
+
+	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/term"
 )
 
 const loginURL = "https://account.ccnu.edu.cn/cas/login"
+const libURL = "http://kjyy.ccnu.edu.cn/clientweb/xcus/ic2/Default.aspx"
 
 func main() {
-	client := &http.Client{}
+	// params := url.Values{}
+	// params.Add("service", libURL)
+	// fullURL := loginURL + "?" + libURL
+	jar, err := cookiejar.New(nil)
+	if err != nil {
+		panic(err)
+	}
+
+	client := &http.Client{
+		Jar: jar,
+	}
 
 	req, err := http.NewRequest("GET", loginURL, nil)
 	if err != nil {
@@ -26,30 +44,97 @@ func main() {
 
 	defer resp.Body.Close()
 
-	var jsessionid string
-	for key, items := range resp.Header {
-		if key == "Set-Cookie" {
-			jsessionid = items[0]
-		}
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		panic(err)
 	}
-	if len(jsessionid) == 0 {
-		fmt.Printf("failed at finding jsessionid")
+
+	lt, exists := doc.Find("input[name='lt']").Attr("value")
+	if !exists {
+		fmt.Println("lt doesn't exist")
 		return
 	}
 
-	// jsessionidString := resp.Header.Get("Set-Cookie")
-	jsessionid, err = extractJSessionID(jsessionid)
-	if err != nil {
-		fmt.Printf("failed at extracting: %q", err)
+	execution, exists := doc.Find("input[name='execution']").Attr("value")
+	if !exists {
+		fmt.Println("execution doesn't exist")
+		return
 	}
 
-	req1, err := http.NewRequest("POST", loginURL+";jsessionid="+jsessionid, nil)
+	var username, pswd string
+	fmt.Println("请输入用户名:")
+	fmt.Scanln(&username)
+	fmt.Println("请输入密码:")
+
+	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
+	if err != nil {
+		log.Fatal("读取密码失败:", err)
+	}
+	pswd = string(bytePassword)
+	fmt.Println()
+
+	loginData := url.Values{}
+	loginData.Add("username", username)
+	loginData.Add("password", pswd)
+	loginData.Add("lt", lt)
+	loginData.Add("execution", execution)
+	loginData.Add("_eventId", "submit")
+	loginData.Add("submit", "登录")
+
+	var jsessionid string
+	// for key, items := range resp.Header {
+	// 	if key == "Set-Cookie" {
+	// 		jsessionid = items[0]
+	// 	}
+	// }
+
+	// for key, items := range resp.Header {
+	// 	fmt.Println(key)
+	// 	for _, item := range items {
+	// 		fmt.Printf("item: %s\n", item)
+	// 	}
+	// }
+
+	// if len(jsessionid) == 0 {
+	// 	fmt.Printf("failed at finding jsessionid")
+	// 	return
+	// }
+
+	// jsessionid, err = extractJSessionID(jsessionid)
+	// if err != nil {
+	// 	fmt.Printf("failed at extracting: %q", err)
+	// }
+	// // fmt.Println(jsessionid)
+
+	url, err := url.Parse(loginURL)
+	if err != nil {
+		panic(err)
+	}
+	for _, k := range jar.Cookies(url) {
+		if k.Name == "JSESSIONID" {
+			jsessionid = k.Value
+			break
+		}
+	}
+
+	// jar.SetCookies(url, []*http.Cookie{
+	// 	{
+	// 		Name:  "JSESSIONID",
+	// 		Value: jsessionid,
+	// 		Path:  "/",
+	// 	},
+	// })
+
+	loginDataString := loginData.Encode()
+	fmt.Println(loginDataString)
+	req1, err := http.NewRequest("POST", loginURL+";jsessionid="+jsessionid, strings.NewReader(loginDataString))
 	if err != nil {
 		fmt.Printf("failed at newing req: %q", err)
 		return
 	}
 
-	req1.Header.Set("Cookie", "JSESSIONID="+jsessionid)
+	// 也没用
+	// req1.Header.Set("Cookie", "JSESSIONID="+jsessionid)
 
 	resp1, err := client.Do(req1)
 	if err != nil {
@@ -67,11 +152,30 @@ func main() {
 	for key, items := range resp1.Header {
 		fmt.Println(key)
 		for _, item := range items {
-			fmt.Printf("\nitem: %s\n", item)
+			fmt.Printf("item: %s\n", item)
 		}
 	}
 
 	fmt.Println(string(body))
+
+	// req2, err := http.NewRequest("GET", libURL, nil)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// resp2, err := client.Do(req2)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// defer resp2.Body.Close()
+
+	// body, err := io.ReadAll(resp2.Body)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	// fmt.Println(string(body))
+
 }
 
 func extractJSessionID(cookieHeader string) (string, error) {
