@@ -109,7 +109,7 @@ func main() {
 	}
 
 	err = chromedp.Run(taskCtx,
-		chromedp.SendKeys(`#dlg_resv_panel_default_638996826004808973 > form > div:nth-child(1) > table > tbody:nth-child(1) > tr.md_group > td.dlg_mb_panel > div > div > input`, "2025211326", chromedp.ByID),
+		chromedp.SendKeys(`#dlg_resv_panel_default_638996826004808973 > form > div:nth-child(1) > table > tbody:nth-child(1) > tr.md_group > td.dlg_mb_panel > div > div > input`, username, chromedp.ByID),
 		chromedp.WaitVisible(`#ui-id-1 > li`, chromedp.ByID),
 	)
 	if err != nil {
