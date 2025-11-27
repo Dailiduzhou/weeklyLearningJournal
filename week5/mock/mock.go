@@ -16,6 +16,7 @@ import (
 
 const loginURL = "https://account.ccnu.edu.cn/cas/login"
 const libURL = "http://kjyy.ccnu.edu.cn/clientweb/xcus/ic2/Default.aspx"
+const requestURL = loginURL + "?service=" + libURL
 
 func main() {
 	// params := url.Values{}
@@ -30,7 +31,7 @@ func main() {
 		Jar: jar,
 	}
 
-	req, err := http.NewRequest("GET", loginURL, nil)
+	req, err := http.NewRequest("GET", requestURL, nil)
 	if err != nil {
 		fmt.Printf("failed at newing req: %q", err)
 		return
