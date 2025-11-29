@@ -7,14 +7,12 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 	"time"
-)
 
-const (
-	username = "xxx"
-	password = "xxx"
+	"golang.org/x/term"
 )
 
 var Lt, Execution, Cookies string
@@ -73,6 +71,18 @@ func main() {
 		fmt.Println("No match found")
 	}
 
+	var username, password string
+	fmt.Println("请输入用户名:")
+	fmt.Scanln(&username)
+	fmt.Println("请输入密码:")
+
+	bytePassword, err := term.ReadPassword(int(os.Stdin.Fd()))
+	if err != nil {
+		log.Fatal("读取密码失败:", err)
+	}
+	password = string(bytePassword)
+	fmt.Println()
+
 	//fmt.Println(Lt, Execution, Cookies)
 
 	data := url.Values{}
@@ -101,7 +111,7 @@ func main() {
 	}
 	defer resp.Body.Close()
 
-	//fmt.Println(resp.Body)
+	// fmt.Println(resp.Body)
 	//fmt.Println(resp.Header)
 
 	now := time.Now()
