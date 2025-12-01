@@ -518,6 +518,8 @@ func loginHandler1(c *gin.Context) {
 		return
 	}
 
+	// params := url.Values{}
+	// params.Add(.., ..)
 	redirectURL := fmt.Sprintf("/profiles?token=%s&username=%s", tokenString, username)
 	c.Redirect(http.StatusFound, redirectURL)
 }

@@ -239,9 +239,11 @@ func main() {
 		go func(s, e int) {
 			defer wg.Done()
 
+			// control concurrency
 			semaphore <- struct{}{}
 			defer func() { <-semaphore }()
 
+			// handle timeout
 			select {
 			case <-ctx.Done():
 				return
