@@ -1,0 +1,355 @@
+openapi: 3.0.3
+info:
+  title: 用户管理系统 API
+  description: |
+    基于 Gin 框架的用户管理系统 API，支持用户注册、登录、资料管理和权限控制。
+    使用双存储机制（文件系统 + MySQL），支持优雅退出和数据持久化。
+    
+    主要功能：
+    1. 用户注册与登录
+    2. 个人资料查看与修改
+    3. 密码修改
+    4. 管理员用户列表查看
+    5. Swagger UI 集成
+    
+    认证方式：基于 Cookie 的会话管理
+  version: 1.0.0
+  contact:
+    name: API 支持
+    url: http://localhost:8080/docs
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: 本地开发服务器
+
+tags:
+  - name: 认证
+    description: 用户登录、登出相关操作
+  - name: 用户管理
+    description: 用户注册、资料管理、密码修改
+  - name: 管理员
+    description: 管理员专用接口（需要 admin 权限）
+
+paths:
+  # ========== 认证相关接口 ==========
+  /api/auth/login:
+    post:
+      tags:
+        - 认证
+      summary: 用户登录
+      description: 使用用户名和密码进行登录，成功后将设置会话 Cookie
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  description: 用户名
+                password:
+                  type: string
+                  format: password
+                  description: 密码
+              required:
+                - username
+                - password
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  username:
+                    type: string
+                  name:
+                    type: string
+        '400':
+          description: 请求参数错误
+        '403':
+          description: 密码错误
+        '500':
+          description: 服务器内部错误
+      x-codegen-request-body-name: body
+
+  /api/auth/logout:
+    post:
+      tags:
+        - 认证
+      summary: 用户登出
+      description: 清除用户会话，登出系统
+      operationId: logout
+      responses:
+        '200':
+          description: 登出成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "登出成功"
+
+  # ========== 用户管理接口 ==========
+  /api/users:
+    post:
+      tags:
+        - 用户管理
+      summary: 用户注册
+      description: 注册新用户
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  description: 用户名（唯一）
+                password:
+                  type: string
+                  format: password
+                  description: 密码
+                name:
+                  type: string
+                  description: 用户姓名
+              required:
+                - username
+                - password
+                - name
+      responses:
+        '201':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  username:
+                    type: string
+                  name:
+                    type: string
+        '400':
+          description: |
+            可能的错误：
+            1. 参数为空
+            2. 用户名已存在
+        '500':
+          description: 服务器内部错误
+      x-codegen-request-body-name: body
+
+    get:
+      tags:
+        - 管理员
+      summary: 获取用户列表
+      description: 管理员专用接口，获取所有用户列表（仅管理员可访问）
+      operationId: listUsers
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: 成功获取用户列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+                  count:
+                    type: integer
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+
+  /api/users/me:
+    get:
+      tags:
+        - 用户管理
+      summary: 获取当前用户信息
+      description: 获取当前登录用户的个人信息
+      operationId: getCurrentUser
+      security:
+        - sessionAuth: []
+      responses:
+        '200':
+          description: 成功获取用户信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          description: 服务器内部错误
+
+    put:
+      tags:
+        - 用户管理
+      summary: 更新用户资料
+      description: 更新当前用户的用户名和/或姓名
+      operationId: updateProfile
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  description: 新用户名（可选）
+                name:
+                  type: string
+                  description: 新姓名（可选）
+      responses:
+        '200':
+          description: 更新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  username:
+                    type: string
+                  name:
+                    type: string
+        '400':
+          description: |
+            可能的错误：
+            1. 未检测到有效更改
+            2. 新用户名与原用户名相同
+            3. 新姓名与原姓名相同
+            4. 新用户名已存在
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          description: 服务器内部错误
+
+  /api/users/me/password:
+    put:
+      tags:
+        - 用户管理
+      summary: 修改密码
+      description: 修改当前用户的密码
+      operationId: changePassword
+      security:
+        - sessionAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                oldpassword:
+                  type: string
+                  format: password
+                  description: 原密码
+                password:
+                  type: string
+                  format: password
+                  description: 新密码
+                password1:
+                  type: string
+                  format: password
+                  description: 确认新密码
+              required:
+                - oldpassword
+                - password
+                - password1
+      responses:
+        '200':
+          description: 密码修改成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "密码修改成功"
+        '400':
+          description: |
+            可能的错误：
+            1. 密码字段为空
+            2. 两次输入的新密码不一致
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          description: 原密码错误
+        '500':
+          description: 服务器内部错误
+
+# ========== 组件定义 ==========
+components:
+  securitySchemes:
+    sessionAuth:
+      type: apiKey
+      in: cookie
+      name: authSession
+      description: 基于 Cookie 的会话认证
+
+  schemas:
+    User:
+      type: object
+      properties:
+        username:
+          type: string
+          description: 用户名
+        name:
+          type: string
+          description: 用户姓名
+      required:
+        - username
+        - name
+
+    UserResponse:
+      type: object
+      properties:
+        username:
+          type: string
+        name:
+          type: string
+
+  responses:
+    UnauthorizedError:
+      description: 未认证或会话过期
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "未认证,请先登录"
+
+    ForbiddenError:
+      description: 权限不足
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+                example: "权限不足,需要管理员权限"
+
+# ========== 安全要求 ==========
+security:
+  - sessionAuth: []
