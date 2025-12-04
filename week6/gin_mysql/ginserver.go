@@ -816,7 +816,6 @@ func listUsersHandler(c *gin.Context) {
 		users = append(users, User{
 			Username: user.Username,
 			Name:     user.Name,
-			// 不返回敏感信息
 		})
 	}
 	mutex.RUnlock()
