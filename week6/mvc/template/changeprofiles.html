@@ -49,13 +49,11 @@
 <body>
     <h1>更改用户{{.username}}信息</h1>
     <form action="/api/users/me" method="PUT">
-        <label for="username">用户名：</label>
-        <input type="text" id="username" name="username">
         
-        <label for="newusername">新用户名：</label>
+        <label for="newusername">新用户名可选：</label>
         <input type="text" id="newusername" name="newusername">
         
-        <label for="newname">新昵称：</label>
+        <label for="newname">新昵称（可选）：</label>
         <input type="text" id="newname" name="newname">
         
         <input type="submit" value="提交">

@@ -657,8 +657,8 @@ func updateUserProfileHandler(c *gin.Context) {
 	}
 	currentUsername := sessUsername.(string)
 
-	newUsername := c.PostForm("username")
-	newName := c.PostForm("name")
+	newUsername := c.PostForm("newusername")
+	newName := c.PostForm("newname")
 
 	mutex.RLock()
 	user, exists := userStore[currentUsername]

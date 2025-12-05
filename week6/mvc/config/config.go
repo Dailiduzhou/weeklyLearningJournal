@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/driver/mysql"
@@ -31,5 +33,11 @@ func InitDB() *gorm.DB {
 }
 
 func InitHTML(r *gin.Engine) {
-	r.LoadHTMLGlob("../template/*.html")
+	wd, err := os.Getwd()
+	if err != nil {
+		log.Fatal("获取工作目录失败:", err)
+	}
+	templatePattern := filepath.Join(wd, "template", "*.html")
+	r.LoadHTMLGlob(templatePattern)
+	log.Println("HTML 模板加载成功: " + templatePattern)
 }

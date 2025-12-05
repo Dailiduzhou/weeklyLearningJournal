@@ -22,9 +22,20 @@ func (s *UserService) CreateUser(user *model.User) error {
 
 func (s *UserService) GetUser(username string) (*model.User, error) {
 	var user model.User
-	err := s.db.First(&user, username).Error
+	err := s.db.Where("username = ?", username).First(&user).Error
 	if err != nil {
 		return nil, err
 	}
 	return &user, nil
+}
+
+func (s *UserService) UpdateUser(username string, updates map[string]interface{}) error {
+	return s.db.Model(&model.User{}).Where("username = ?", username).Updates(updates).Error
+}
+
+func (s *UserService) GetAllUsers(users *[]model.User) error {
+	if err := s.db.Find(&users).Error; err != nil {
+		return err
+	}
+	return nil
 }
