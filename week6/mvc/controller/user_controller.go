@@ -212,7 +212,7 @@ func (c *UserController) PageChangeProfile(ctx *gin.Context) {
 	session := sessions.Default(ctx)
 	username := session.Get("username")
 
-	if username != nil {
+	if username == "" {
 		ctx.Redirect(http.StatusFound, "/api/users/login")
 		return
 	}
