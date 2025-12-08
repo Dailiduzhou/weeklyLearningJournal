@@ -1,0 +1,19 @@
+# Week7
+## 小游戏
+### 攻略笔记
+1. docker run -d registry.cn-shenzhen.aliyuncs.com/muxi/deep-inside-the-container:latest
+2. docker ps
+3. docker exec -it [container id] /bin/bash
+4. sudo ./start
+5. cd triggerfs
+6. ls
+7. cat ./？？？.pem
+8. cat 日记.txt
+9. cat secret.txt
+// 卡关了，再说吧
+
+> `docker logs [container id]`貌似没有游戏提示。
+
+### 源码及分析
+#### 路径
+container : `/tmp`
