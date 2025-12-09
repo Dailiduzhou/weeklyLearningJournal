@@ -1,0 +1,17 @@
+version: '3.8'
+# TODO 让服务A运行在8080端口上，A和B需要在同一个网络，访问A以寻求你想要的
+services:
+  service_a:
+    image: registry.cn-shenzhen.aliyuncs.com/muxi/deep-inside-the-container:A
+    container_name: service_a_container
+    ports: 
+      - "8080:80"
+    networks:
+      - internal_network
+
+  service_b:
+    image: registry.cn-shenzhen.aliyuncs.com/muxi/deep-inside-the-container:B
+    container_name: service_b_container
+networks:
+  internal_network:
+    driver: bridge
