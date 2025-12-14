@@ -1,7 +1,7 @@
 # Week8
 ## 图书馆管理系统
 在这个路径下，
-[图书馆管理系统](https://github.com/Dailiduzhou/libaray_manage_sys)
+[图书馆管理系统](https://github.com/Dailiduzhou/library_manage_sys)
 ### 图书封面
 图书封面不宜直接存储到`SQL`，而是要在数据库里存储图片`路径`或`URL`。
 为了实现图书封面的`CURD`，我要完成以下事务：
