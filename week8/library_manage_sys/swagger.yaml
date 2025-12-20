@@ -1,0 +1,487 @@
+basePath: /api
+definitions:
+  models.Book:
+    description: 图书详细信息
+    properties:
+      author:
+        type: string
+      cover_path:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      initial_stock:
+        minimum: 0
+        type: integer
+      stock:
+        minimum: 0
+        type: integer
+      summary:
+        type: string
+      title:
+        type: string
+      total_stock:
+        minimum: 0
+        type: integer
+      updated_at:
+        type: string
+    type: object
+  models.BorrowRecord:
+    description: 借阅记录
+    properties:
+      book_id:
+        type: integer
+      borrow_date:
+        type: string
+      created_at:
+        type: string
+      deleted_at:
+        description: 使用指针类型
+        type: string
+      id:
+        description: 显式定义 gorm.Model 的字段
+        type: integer
+      return_date:
+        type: string
+      status:
+        description: borrowed/returned
+        type: string
+      updated_at:
+        type: string
+      user_id:
+        type: integer
+    type: object
+  models.FindBookRequest:
+    description: 包含图书ID的请求
+    properties:
+      id:
+        type: integer
+    required:
+    - id
+    type: object
+  models.LoginRequest:
+    description: 用户登录凭证
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  models.RegisterRequest:
+    description: 用户注册所需参数
+    properties:
+      password:
+        minLength: 6
+        type: string
+      username:
+        maxLength: 20
+        minLength: 3
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  models.Response:
+    description: 通用响应结构
+    properties:
+      code:
+        type: integer
+      data: {}
+      msg:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: dailiduzhou@example.com
+    name: API Support
+  description: This is a library management system API
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Library Management System API
+  version: "1.0"
+paths:
+  /api//auth/login:
+    post:
+      consumes:
+      - application/json
+      description: 用户身份验证
+      parameters:
+      - description: 登录请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 登录成功
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/models.Response'
+        "403":
+          description: 认证失败
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 用户登录
+      tags:
+      - auth
+  /api/auth/logout:
+    post:
+      description: 清除会话
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 登出成功
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 用户登出
+      tags:
+      - auth
+  /api/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: 创建新用户账号
+      parameters:
+      - description: 注册请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 注册成功
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/models.Response'
+        "409":
+          description: 用户已存在
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/models.Response'
+      summary: 用户注册
+      tags:
+      - auth
+  /api/books:
+    get:
+      description: 按条件查询图书
+      parameters:
+      - description: 按书名模糊查询
+        in: query
+        name: title
+        type: string
+      - description: 按作者模糊查询
+        in: query
+        name: author
+        type: string
+      - description: 按简介模糊查询
+        in: query
+        name: summary
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 查询成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/models.Book'
+                  type: array
+              type: object
+        "500":
+          description: 数据库错误
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 获取图书列表
+      tags:
+      - books
+    post:
+      consumes:
+      - multipart/form-data
+      description: 添加新图书（管理员权限）
+      parameters:
+      - description: 书名
+        in: formData
+        name: title
+        required: true
+        type: string
+      - description: 作者
+        in: formData
+        name: author
+        required: true
+        type: string
+      - description: 简介
+        in: formData
+        name: summary
+        type: string
+      - description: 封面图片
+        in: formData
+        name: cover
+        type: file
+      - description: 初始库存
+        in: formData
+        minimum: 0
+        name: initial_stock
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 创建成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Book'
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/models.Response'
+        "409":
+          description: 图书已存在
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 创建图书
+      tags:
+      - books
+  /api/books/{id}:
+    delete:
+      description: 删除指定图书（管理员权限）
+      parameters:
+      - description: 图书ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除成功
+          schema:
+            $ref: '#/definitions/models.Response'
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/models.Response'
+        "404":
+          description: 图书不存在
+          schema:
+            $ref: '#/definitions/models.Response'
+        "409":
+          description: 图书仍在借阅中
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 删除图书
+      tags:
+      - books
+    put:
+      consumes:
+      - multipart/form-data
+      description: 修改图书信息（管理员权限）
+      parameters:
+      - description: 图书ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 新书名
+        in: formData
+        name: title
+        type: string
+      - description: 新作者
+        in: formData
+        name: author
+        type: string
+      - description: 新简介
+        in: formData
+        name: summary
+        type: string
+      - description: 新封面
+        in: formData
+        name: cover
+        type: file
+      - description: 当前库存
+        in: formData
+        minimum: 0
+        name: stock
+        type: integer
+      - description: 总库存
+        in: formData
+        minimum: 0
+        name: total_stock
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 更新成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.Book'
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/models.Response'
+        "404":
+          description: 图书不存在
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 更新图书
+      tags:
+      - books
+  /api/borrows:
+    post:
+      consumes:
+      - application/json
+      description: 创建借阅记录
+      parameters:
+      - description: 借阅请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.FindBookRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 借阅成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.BorrowRecord'
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/models.Response'
+        "404":
+          description: 图书不存在
+          schema:
+            $ref: '#/definitions/models.Response'
+        "409":
+          description: 库存不足
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 借阅图书
+      tags:
+      - borrows
+  /api/borrows/return:
+    post:
+      consumes:
+      - application/json
+      description: 更新借阅状态
+      parameters:
+      - description: 归还请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/models.FindBookRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 归还成功
+          schema:
+            allOf:
+            - $ref: '#/definitions/models.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/models.BorrowRecord'
+              type: object
+        "400":
+          description: 参数错误
+          schema:
+            $ref: '#/definitions/models.Response'
+        "404":
+          description: 记录不存在
+          schema:
+            $ref: '#/definitions/models.Response'
+        "500":
+          description: 服务器错误
+          schema:
+            $ref: '#/definitions/models.Response'
+      security:
+      - ApiKeyAuth: []
+      summary: 归还图书
+      tags:
+      - borrows
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

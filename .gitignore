@@ -6,3 +6,6 @@ Thumbs.db
 /week3/image/beauty.jpg
 /week5/examples
 /week6/test
+
+target/
+**/*.rs.bk

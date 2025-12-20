@@ -57,3 +57,13 @@ func RemoveFile(filePath string) {
 	}
 }
 ```
+## 加密`hacker_GUI_game`
+`hacker_GUI_game happy ending`
+base64
+----->`aGFja2VyX0dVSV9nYW1lIGhhcHB5IGVuZGluZw==`
+caesar +5
+--->`fLKof2AdC0iAXA9sDB1qNLmmhMG5NLAzELqzEb==`
+
+AES_key: `nonesense`
+----> ``
+AES
