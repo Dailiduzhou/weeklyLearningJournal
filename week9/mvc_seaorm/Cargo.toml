@@ -1,0 +1,18 @@
+[package]
+name = "mvc_seaorm"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+actix-web = "4"
+actix-session = { version = "0.8", features = ["cookie-session"] }
+tera = "1.17"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bcrypt = "0.15"
+sea-orm = { version = "0.12", features = ["sqlx-mysql", "runtime-tokio-native-tls", "macros"] }
+chrono = { version = "0.4", features = ["serde"] }
+env_logger = "0.10"
+log = "0.4"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+anyhow = "1"
