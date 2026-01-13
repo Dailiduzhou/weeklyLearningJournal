@@ -362,7 +362,7 @@ async fn users_data(session: Session, state: web::Data<AppState>) -> impl Respon
     if username.is_none() {
         return HttpResponse::Unauthorized().json(serde_json::json!({"error": "未认证,请先登录"}));
     }
-    
+
     if username.as_deref() != Some("admin") {
         return HttpResponse::Forbidden()
             .json(serde_json::json!({"error": "权限不足,需要管理员权限"}));
