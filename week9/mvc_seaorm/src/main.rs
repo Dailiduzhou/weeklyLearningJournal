@@ -1,23 +1,21 @@
 mod entity;
 
-use actix_session::{Session, SessionMiddleware, storage::CookieSessionStore};
-use actix_web::{get, post, put, web, App, HttpResponse, HttpServer, Responder};
+use actix_session::{storage::RedisSessionStore, Session, SessionMiddleware};
 use actix_web::cookie::Key;
 use actix_web::middleware::Logger;
+use actix_web::{get, post, put, web, App, HttpResponse, HttpServer, Responder};
 use bcrypt::{hash, verify, DEFAULT_COST};
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, Database, DatabaseConnection, 
-    EntityTrait, QueryFilter, Set, DbErr
+    ActiveModelTrait, ColumnTrait, Database, DatabaseConnection, EntityTrait, QueryFilter, Set,
 };
 use serde::Deserialize;
-use tera::{Tera, Context};
+use tera::{Context, Tera};
 
-use entity::{Entity as UserEntity, Model as User, ActiveModel as UserActiveModel, Column as UserColumn};
+use entity::{ActiveModel as UserActiveModel, Column as UserColumn, Entity as UserEntity};
 
 #[derive(Clone)]
 struct AppState {
     db: DatabaseConnection,
-    tera: Tera,
 }
 
 // ========== 注册相关 ==========
@@ -28,28 +26,34 @@ async fn page_register(tmpl: web::Data<Tera>) -> impl Responder {
     ctx.insert("title", "用户注册");
     match tmpl.render("register.html", &ctx) {
         Ok(html) => HttpResponse::Ok().content_type("text/html").body(html),
-        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()})),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
     }
 }
 
 #[derive(Deserialize)]
-struct RegisterForm { 
-    username: String, 
-    password: String, 
-    name: String 
+struct RegisterForm {
+    username: String,
+    password: String,
+    name: String,
 }
 
 #[post("/api/users")]
 async fn register(form: web::Form<RegisterForm>, state: web::Data<AppState>) -> impl Responder {
     if form.username.is_empty() || form.password.is_empty() || form.name.is_empty() {
-        return HttpResponse::BadRequest().json(serde_json::json!({"error": "用户名、密码和姓名不能为空"}));
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({"error": "用户名、密码和姓名不能为空"}));
     }
-    
-    let hashed = match hash(&form.password, DEFAULT_COST) { 
-        Ok(h) => h, 
-        Err(_) => return HttpResponse::InternalServerError().json(serde_json::json!({"error": "密码加密失败"})) 
+
+    let hashed = match hash(&form.password, DEFAULT_COST) {
+        Ok(h) => h,
+        Err(_) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({"error": "密码加密失败"}))
+        }
     };
-    
+
     let new_user = UserActiveModel {
         username: Set(form.username.clone()),
         password: Set(hashed),
@@ -58,13 +62,15 @@ async fn register(form: web::Form<RegisterForm>, state: web::Data<AppState>) -> 
         updated_at: Set(Some(chrono::Local::now().naive_local())),
         ..Default::default()
     };
-    
+
     match new_user.insert(&state.db).await {
         Ok(_) => HttpResponse::Created().json(serde_json::json!({
             "username": form.username,
             "name": form.name
         })),
-        Err(_) => HttpResponse::InternalServerError().json(serde_json::json!({"error": "创建用户失败"})),
+        Err(_) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": "创建用户失败"}))
+        }
     }
 }
 
@@ -76,41 +82,51 @@ async fn page_login(tmpl: web::Data<Tera>) -> impl Responder {
     ctx.insert("title", "用户登录");
     match tmpl.render("login.html", &ctx) {
         Ok(html) => HttpResponse::Ok().content_type("text/html").body(html),
-        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()})),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
     }
 }
 
 #[derive(Deserialize)]
-struct LoginForm { 
-    username: String, 
-    password: String 
+struct LoginForm {
+    username: String,
+    password: String,
 }
 
 #[post("/api/users/login")]
-async fn login(form: web::Form<LoginForm>, session: Session, state: web::Data<AppState>) -> impl Responder {
+async fn login(
+    form: web::Form<LoginForm>,
+    session: Session,
+    state: web::Data<AppState>,
+) -> impl Responder {
     if form.username.is_empty() || form.password.is_empty() {
-        return HttpResponse::BadRequest().json(serde_json::json!({"error": "用户名和密码不能为空"}));
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({"error": "用户名和密码不能为空"}));
     }
-    
+
     let user = UserEntity::find()
         .filter(UserColumn::Username.eq(&form.username))
         .one(&state.db)
         .await;
-    
+
     let user = match user {
         Ok(Some(u)) => u,
-        Ok(None) => return HttpResponse::NotFound().json(serde_json::json!({"error": "用户不存在"})),
+        Ok(None) => {
+            return HttpResponse::NotFound().json(serde_json::json!({"error": "用户不存在"}))
+        }
         Err(_) => return HttpResponse::InternalServerError().finish(),
     };
-    
+
     if !verify(&form.password, &user.password).unwrap_or(false) {
         return HttpResponse::Forbidden().json(serde_json::json!({"error": "密码错误"}));
     }
-    
-    if session.insert("username", &user.username).is_err() { 
-        return HttpResponse::InternalServerError().json(serde_json::json!({"error": "会话创建失败"}));
+
+    if session.insert("username", &user.username).is_err() {
+        return HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "会话创建失败"}));
     }
-    
+
     HttpResponse::Ok().json(serde_json::json!({
         "username": user.username,
         "name": user.name
@@ -120,31 +136,41 @@ async fn login(form: web::Form<LoginForm>, session: Session, state: web::Data<Ap
 // ========== 个人信息页 ==========
 
 #[get("/api/users/me")]
-async fn page_profiles(session: Session, tmpl: web::Data<Tera>, state: web::Data<AppState>) -> impl Responder {
+async fn page_profiles(
+    session: Session,
+    tmpl: web::Data<Tera>,
+    state: web::Data<AppState>,
+) -> impl Responder {
     let username: Option<String> = session.get("username").unwrap_or(None);
     if username.is_none() {
-        return HttpResponse::Found().append_header(("Location", "/api/users/login")).finish();
+        return HttpResponse::Found()
+            .append_header(("Location", "/api/users/login"))
+            .finish();
     }
-    
+
     let user = UserEntity::find()
         .filter(UserColumn::Username.eq(username.as_ref().unwrap()))
         .one(&state.db)
         .await;
-    
+
     let user = match user {
         Ok(Some(u)) => u,
         Ok(None) | Err(_) => {
-            let _ = session.purge();
-            return HttpResponse::Found().append_header(("Location", "/api/users/login")).finish();
+            session.purge();
+            return HttpResponse::Found()
+                .append_header(("Location", "/api/users/login"))
+                .finish();
         }
     };
-    
+
     let mut ctx = Context::new();
     ctx.insert("username", &user.username);
     ctx.insert("name", &user.name);
     match tmpl.render("profiles.html", &ctx) {
         Ok(html) => HttpResponse::Ok().content_type("text/html").body(html),
-        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()})),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
     }
 }
 
@@ -152,7 +178,7 @@ async fn page_profiles(session: Session, tmpl: web::Data<Tera>, state: web::Data
 
 #[post("/api/users/logout")]
 async fn logout(session: Session) -> impl Responder {
-    let _ = session.purge();
+    session.purge();
     HttpResponse::Ok().json(serde_json::json!({"message": "登出成功"}))
 }
 
@@ -162,71 +188,84 @@ async fn logout(session: Session) -> impl Responder {
 async fn page_change_profile(session: Session, tmpl: web::Data<Tera>) -> impl Responder {
     let username: Option<String> = session.get("username").unwrap_or(None);
     if username.is_none() {
-        return HttpResponse::Found().append_header(("Location", "/api/users/login")).finish();
+        return HttpResponse::Found()
+            .append_header(("Location", "/api/users/login"))
+            .finish();
     }
     let mut ctx = Context::new();
     ctx.insert("username", &username.unwrap());
     match tmpl.render("changeprofiles.html", &ctx) {
         Ok(html) => HttpResponse::Ok().content_type("text/html").body(html),
-        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()})),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
     }
 }
 
 #[derive(Deserialize)]
-struct ChangeProfileForm { 
-    newusername: Option<String>, 
-    newname: Option<String> 
+struct ChangeProfileForm {
+    newusername: Option<String>,
+    newname: Option<String>,
 }
 
 #[put("/api/users/profiles")]
-async fn change_profile(session: Session, form: web::Form<ChangeProfileForm>, state: web::Data<AppState>) -> impl Responder {
+async fn change_profile(
+    session: Session,
+    form: web::Form<ChangeProfileForm>,
+    state: web::Data<AppState>,
+) -> impl Responder {
     let session_username: Option<String> = session.get("username").unwrap_or(None);
     if session_username.is_none() {
         return HttpResponse::Unauthorized().json(serde_json::json!({"error": "未认证,请先登录"}));
     }
-    
+
     let user = UserEntity::find()
         .filter(UserColumn::Username.eq(session_username.as_ref().unwrap()))
         .one(&state.db)
         .await;
-    
+
     let user = match user {
         Ok(Some(u)) => u,
-        Ok(None) => return HttpResponse::Forbidden().json(serde_json::json!({"error": "用户不存在"})),
+        Ok(None) => {
+            return HttpResponse::Forbidden().json(serde_json::json!({"error": "用户不存在"}))
+        }
         Err(_) => return HttpResponse::InternalServerError().finish(),
     };
 
     if form.newusername.is_none() && form.newname.is_none() {
         return HttpResponse::BadRequest().json(serde_json::json!({"error": "未检测到有效更改"}));
     }
-    if let Some(newu) = &form.newusername { 
-        if *newu == user.username { 
-            return HttpResponse::BadRequest().json(serde_json::json!({"error": "新用户名与原用户名相同"})); 
-        } 
+    if let Some(newu) = &form.newusername {
+        if *newu == user.username {
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": "新用户名与原用户名相同"}));
+        }
     }
-    if let Some(newn) = &form.newname { 
-        if *newn == user.name { 
-            return HttpResponse::BadRequest().json(serde_json::json!({"error": "新姓名与原姓名相同"})); 
-        } 
+    if let Some(newn) = &form.newname {
+        if *newn == user.name {
+            return HttpResponse::BadRequest()
+                .json(serde_json::json!({"error": "新姓名与原姓名相同"}));
+        }
     }
 
     let mut active_user: UserActiveModel = user.into();
-    if let Some(nu) = &form.newusername { 
-        active_user.username = Set(nu.clone()); 
+    if let Some(nu) = &form.newusername {
+        active_user.username = Set(nu.clone());
     }
-    if let Some(nn) = &form.newname { 
-        active_user.name = Set(nn.clone()); 
+    if let Some(nn) = &form.newname {
+        active_user.name = Set(nn.clone());
     }
     active_user.updated_at = Set(Some(chrono::Local::now().naive_local()));
-    
+
     match active_user.update(&state.db).await {
         Ok(_) => {
-            if let Some(newu) = &form.newusername { 
-                let _ = session.insert("username", newu); 
+            if let Some(newu) = &form.newusername {
+                let _ = session.insert("username", newu);
             }
             HttpResponse::Ok().json(serde_json::json!({"message": "用户信息更新成功"}))
-        },
-        Err(_) => HttpResponse::InternalServerError().json(serde_json::json!({"error": "更新用户信息失败"})),
+        }
+        Err(_) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "更新用户信息失败"})),
     }
 }
 
@@ -236,63 +275,79 @@ async fn change_profile(session: Session, form: web::Form<ChangeProfileForm>, st
 async fn page_change_password(session: Session, tmpl: web::Data<Tera>) -> impl Responder {
     let username: Option<String> = session.get("username").unwrap_or(None);
     if username.is_none() {
-        return HttpResponse::Found().append_header(("Location", "/login")).finish();
+        return HttpResponse::Found()
+            .append_header(("Location", "/login"))
+            .finish();
     }
     let mut ctx = Context::new();
     ctx.insert("title", "修改密码");
     match tmpl.render("changepassword.html", &ctx) {
         Ok(html) => HttpResponse::Ok().content_type("text/html").body(html),
-        Err(e) => HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()})),
+        Err(e) => {
+            HttpResponse::InternalServerError().json(serde_json::json!({"error": e.to_string()}))
+        }
     }
 }
 
 #[derive(Deserialize)]
-struct ChangePasswordForm { 
-    oldpassword: String, 
-    password: String, 
-    password1: String 
+struct ChangePasswordForm {
+    oldpassword: String,
+    password: String,
+    password1: String,
 }
 
 #[put("/api/users/password")]
-async fn change_password(session: Session, form: web::Form<ChangePasswordForm>, state: web::Data<AppState>) -> impl Responder {
+async fn change_password(
+    session: Session,
+    form: web::Form<ChangePasswordForm>,
+    state: web::Data<AppState>,
+) -> impl Responder {
     let username: Option<String> = session.get("username").unwrap_or(None);
     if username.is_none() {
         return HttpResponse::Unauthorized().json(serde_json::json!({"error": "未认证,请先登录"}));
     }
     if form.oldpassword.is_empty() || form.password.is_empty() || form.password1.is_empty() {
-        return HttpResponse::BadRequest().json(serde_json::json!({"error": "所有密码字段不能为空"}));
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({"error": "所有密码字段不能为空"}));
     }
-    
+
     let user = UserEntity::find()
         .filter(UserColumn::Username.eq(username.as_ref().unwrap()))
         .one(&state.db)
         .await;
-    
+
     let user = match user {
         Ok(Some(u)) => u,
-        Ok(None) => return HttpResponse::NotFound().json(serde_json::json!({"error": "用户不存在"})),
+        Ok(None) => {
+            return HttpResponse::NotFound().json(serde_json::json!({"error": "用户不存在"}))
+        }
         Err(_) => return HttpResponse::InternalServerError().finish(),
     };
-    
+
     if !verify(&form.oldpassword, &user.password).unwrap_or(false) {
         return HttpResponse::Forbidden().json(serde_json::json!({"error": "原密码错误"}));
     }
-    if form.password != form.password1 { 
-        return HttpResponse::BadRequest().json(serde_json::json!({"error": "两次输入的新密码不一致"})); 
+    if form.password != form.password1 {
+        return HttpResponse::BadRequest()
+            .json(serde_json::json!({"error": "两次输入的新密码不一致"}));
     }
-    
-    let hashed = match hash(&form.password, DEFAULT_COST) { 
-        Ok(h) => h, 
-        Err(_) => return HttpResponse::InternalServerError().json(serde_json::json!({"error": "密码加密失败"})) 
+
+    let hashed = match hash(&form.password, DEFAULT_COST) {
+        Ok(h) => h,
+        Err(_) => {
+            return HttpResponse::InternalServerError()
+                .json(serde_json::json!({"error": "密码加密失败"}))
+        }
     };
-    
+
     let mut active_user: UserActiveModel = user.into();
     active_user.password = Set(hashed);
     active_user.updated_at = Set(Some(chrono::Local::now().naive_local()));
-    
+
     match active_user.update(&state.db).await {
         Ok(_) => HttpResponse::Ok().json(serde_json::json!({"message": "密码修改成功"})),
-        Err(_) => HttpResponse::InternalServerError().json(serde_json::json!({"error": "更新用户信息失败"})),
+        Err(_) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "更新用户信息失败"})),
     }
 }
 
@@ -301,20 +356,22 @@ async fn change_password(session: Session, form: web::Form<ChangePasswordForm>, 
 #[get("/api/admin/users")]
 async fn users_data(session: Session, state: web::Data<AppState>) -> impl Responder {
     let username: Option<String> = session.get("username").unwrap_or(None);
-    if username.is_none() { 
-        return HttpResponse::Unauthorized().json(serde_json::json!({"error": "未认证,请先登录"})); 
+    if username.is_none() {
+        return HttpResponse::Unauthorized().json(serde_json::json!({"error": "未认证,请先登录"}));
     }
-    if username.as_deref() != Some("admin") { 
-        return HttpResponse::Forbidden().json(serde_json::json!({"error": "权限不足,需要管理员权限"})); 
+    if username.as_deref() != Some("admin") {
+        return HttpResponse::Forbidden()
+            .json(serde_json::json!({"error": "权限不足,需要管理员权限"}));
     }
-    
+
     let users = UserEntity::find().all(&state.db).await;
     match users {
         Ok(list) => HttpResponse::Ok().json(serde_json::json!({
             "users": list,
             "count": list.len()
         })),
-        Err(_) => HttpResponse::InternalServerError().json(serde_json::json!({"error": "获取用户信息失败"})),
+        Err(_) => HttpResponse::InternalServerError()
+            .json(serde_json::json!({"error": "获取用户信息失败"})),
     }
 }
 
@@ -323,28 +380,33 @@ async fn users_data(session: Session, state: web::Data<AppState>) -> impl Respon
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init();
-    let key = Key::generate();
+    let secret_key = Key::generate();
+    let redis_url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://redis:6379".to_string());
+    let redis_store = RedisSessionStore::new(&redis_url)
+        .await
+        .expect("Redis连接失败");
 
     // 连接 MySQL 数据库
-    let db_url = "mysql://root:123456@localhost:3307/ginserver";
-    let db = Database::connect(db_url)
-        .await
-        .expect("数据库连接失败");
+    let db_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "mysql://root:123456@mysql:3306/ginserver".to_string());
+    let db = Database::connect(db_url).await.expect("数据库连接失败");
 
     log::info!("数据库连接成功");
 
     // 加载模板
-    let tera = Tera::new("templates/**/*").expect("模板加载失败");
+    let _tera = Tera::new("/app/templates/**/*").expect("模板加载失败");
 
-    let state = AppState { db, tera: tera.clone() };
+    let state = AppState { db };
 
     log::info!("服务器启动在 http://localhost:8080");
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(state.clone()))
-            .app_data(web::Data::new(tera.clone()))
             .wrap(Logger::default())
-            .wrap(SessionMiddleware::new(CookieSessionStore::default(), key.clone()))
+            .wrap(SessionMiddleware::new(
+                redis_store.clone(),
+                secret_key.clone(),
+            ))
             .service(page_register)
             .service(register)
             .service(page_login)

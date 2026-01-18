@@ -152,7 +152,7 @@ async fn page_profiles(
     let user = match user {
         Ok(u) => u,
         Err(_) => {
-            let _ = session.purge();
+            session.purge();
             return HttpResponse::Found()
                 .append_header(("Location", "/api/users/login"))
                 .finish();
@@ -172,7 +172,7 @@ async fn page_profiles(
 
 #[post("/api/users/logout")]
 async fn logout(session: Session) -> impl Responder {
-    let _ = session.purge();
+    session.purge();
     HttpResponse::Ok().json(serde_json::json!({"message": "登出成功"}))
 }
 
@@ -211,12 +211,14 @@ async fn change_profile(
     if session_username.is_none() {
         return HttpResponse::Unauthorized().json(serde_json::json!({"error": "未认证,请先登录"}));
     }
+
     let user = sqlx::query_as::<_, User>(
         "SELECT id, username, password, name, created_at, updated_at FROM users WHERE username = ?",
     )
     .bind(session_username.clone().unwrap())
     .fetch_one(&state.db)
     .await;
+
     let user = match user {
         Ok(u) => u,
         Err(_) => {
@@ -262,6 +264,7 @@ async fn change_profile(
             .execute(&state.db)
             .await
     };
+
     match res {
         Ok(_) => {
             if let Some(newu) = &form.newusername {
@@ -395,7 +398,7 @@ async fn main() -> std::io::Result<()> {
         .expect("数据库连接失败");
 
     // init templates (copy from week6/mvc/template)
-    let mut tera = Tera::new("templates/**/*").expect("模板加载失败");
+    let tera = Tera::new("templates/**/*").expect("模板加载失败");
 
     let state = AppState {
         db: pool,
