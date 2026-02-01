@@ -1,0 +1,6 @@
+[package]
+name = "merge_two_sorted_lists"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
