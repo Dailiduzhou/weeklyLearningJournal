@@ -3,6 +3,7 @@
 ## 问题描述
 
 用户报告聊天室存在以下问题：
+
 1. Go代码中缺少错误处理
 2. 聊天室无法显示消息
 3. 无法显示在线用户数
@@ -17,6 +18,7 @@ ls -la
 ```
 
 发现主要文件：
+
 - `server.go` - Go服务器代码
 - `test-client/test_client.go` - 测试客户端
 - `public/index.html` - 前端页面
@@ -26,6 +28,7 @@ ls -la
 阅读 `server.go` 发现以下问题：
 
 #### 错误处理缺失
+
 ```go
 // 第147行
 c.conn.WriteMessage(websocket.CloseMessage, []byte{})
@@ -37,6 +40,7 @@ c.conn.WriteMessage(websocket.PingMessage, nil)
 ```
 
 #### Hub广播机制问题
+
 ```go
 // hub.run() 中的register case
 case client := <-h.register:
@@ -49,7 +53,9 @@ case client := <-h.register:
 ```
 
 #### 问题分析
+
 当新客户端连接时：
+
 1. 创建client并启动goroutine
 2. 立即向hub.register发送注册请求
 3. hub收到注册后，向broadcast channel发送消息
@@ -70,6 +76,7 @@ cd test-client && go run test_client.go TestUser7
 ### 第2次测试
 
 查看服务器日志：
+
 ```
 2026/02/01 20:32:57 Server started on :8080
 2026/02/01 20:32:57 Hub started
@@ -84,6 +91,7 @@ cd test-client && go run test_client.go TestUser7
 ### 第3次测试
 
 修改测试客户端使用ReadJSON：
+
 ```go
 go func() {
     defer close(done)
@@ -118,6 +126,7 @@ go run test_client.go User2
 ### 1. Goroutine时序问题
 
 原代码顺序：
+
 ```go
 hub.register <- client
 go client.writePump()
@@ -125,6 +134,7 @@ go client.readPump()
 ```
 
 问题：
+
 - 向hub.register发送请求后，立即返回
 - hub收到后立即向broadcast channel发送消息
 - 但writePump goroutine可能还没启动完成
@@ -133,6 +143,7 @@ go client.readPump()
 ### 2. Select随机性问题
 
 hub.run中的select语句：
+
 ```go
 select {
 case client := <-h.register:
@@ -151,6 +162,7 @@ case message := <-h.broadcast:
 ```
 
 由于select的随机性，可能：
+
 - register case先执行，向broadcast发送消息
 - 但此时broadcast case还没准备好接收
 - 导致消息积压或丢失
@@ -170,6 +182,7 @@ send: make(chan Message, 256)
 #### server.go 修复
 
 **修复1 - WriteMessage错误处理（第147行）**
+
 ```go
 // 修复前
 if !ok {
@@ -187,6 +200,7 @@ if !ok {
 ```
 
 **修复2 - PingMessage错误处理（第159行）**
+
 ```go
 // 修复前
 if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
@@ -203,6 +217,7 @@ if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
 #### test_client.go 修复
 
 **修复1 - 连接错误处理**
+
 ```go
 // 修复前
 c, _, err := websocket.DefaultDialer.Dial(u.String(), nil)
@@ -224,6 +239,7 @@ defer func() {
 ```
 
 **修复2 - 写入错误处理**
+
 ```go
 // 修复前
 err := c.WriteJSON(message)
@@ -269,6 +285,7 @@ hub.register <- client
 ```
 
 **说明**：
+
 - 先启动writePump和readPump
 - 等待10ms确保goroutine启动完成
 - 再向hub注册
@@ -329,6 +346,7 @@ case client := <-h.register:
 ```
 
 **优点**：
+
 1. 避免了broadcast channel的竞争
 2. 确保消息按顺序发送
 3. 添加详细日志便于调试
@@ -396,6 +414,7 @@ cd test-client && go run test_client.go TestUser12
 ```
 
 **结果**：
+
 ```
 2026/02/01 20:51:49 Connecting to ws://localhost:8080/ws?username=TestUser12
 2026/02/01 20:51:49 Connected as TestUser12
@@ -416,6 +435,7 @@ go run test_client.go User2 &
 ```
 
 **User1收到**：
+
 ```
 2026/02/01 20:55:36 Received: map[type:userlist usernames:[User1]]
 2026/02/01 20:55:36 Received: map[type:login username:User2]
@@ -425,6 +445,7 @@ go run test_client.go User2 &
 ```
 
 **User2收到**：
+
 ```
 2026/02/01 20:55:36 Received: map[type:userlist usernames:[User1]]
 2026/02/01 20:55:36 Received: map[type:login username:User2]
@@ -434,6 +455,7 @@ go run test_client.go User2 &
 ```
 
 ✅ 两个客户端都能看到：
+
 - 在线用户列表（包含双方）
 - 对方登录/退出通知
 - 对方的聊天消息

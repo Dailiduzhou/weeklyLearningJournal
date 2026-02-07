@@ -494,3 +494,5 @@ $RECYCLE.BIN/
 
 # Vim temporary swap files
 *.swp
+
+26winter/grpc-go/
