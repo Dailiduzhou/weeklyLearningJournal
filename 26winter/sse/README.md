@@ -1,211 +1,191 @@
-# SSE Server
+# SSE - Server Sent Events Client/Server Library for Go
 
-A Go-based Server-Sent Events (SSE) server with JWT authentication, CORS support, and a complete frontend demo.
+## Synopsis
 
-## Features
+SSE is a client/server implementation for Server Sent Events for Golang.
 
-- Real-time score board updates via SSE
-- JWT-based authentication
-- Configurable CORS origins
-- Message history for reconnection support
-- Automatic heartbeat for connection keep-alive
-- Interactive frontend demo with event-source-polyfill
-- Cross-browser compatibility
+## Build status
 
-## Quick Start
+* Master: [![CircleCI  Master](https://circleci.com/gh/r3labs/sse.svg?style=svg)](https://circleci.com/gh/r3labs/sse)
 
-```bash
-# Start both backend and frontend
-./start.sh
+## Quick start
 
-# Or start manually
-go run main.go &
-cd frontend && python3 -m http.server 3000
+To install:
+```
+go get github.com/r3labs/sse/v2
 ```
 
-Then open http://localhost:3000 in your browser.
+To Test:
 
-## Project Structure
-
-```
-sse/
-├── main.go              # Application entry point
-├── go.mod               # Go module definition
-├── .env.example         # Environment variables template
-├── config/
-│   └── config.go        # Configuration management
-├── controller/
-│   └── controller.go    # HTTP handlers
-├── middleware/
-│   └── middleware.go    # CORS and auth middleware
-├── model/
-│   └── model.go         # Data models and broker
-├── utils/
-│   └── utils.go         # JWT utilities
-└── frontend/
-    ├── package.json     # Frontend dependencies
-    ├── index.html       # SSE client demo
-    └── node_modules/    # npm dependencies
+```sh
+$ make deps
+$ make test
 ```
 
-## Setup
+#### Example Server
 
-1. Install Go 1.21 or higher
-2. Install dependencies:
-   ```bash
-   go mod download
-   ```
-
-3. Configure environment variables:
-   ```bash
-   cp .env.example .env
-   # Edit .env with your values
-   ```
-
-## Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `PORT` | Server port | `:8080` |
-| `JWT_SECRET` | JWT signing secret | `18e9ba09a3566f97de630c21331ebc11` |
-| `CORS_ORIGIN` | Allowed CORS origin | `http://localhost:3000` |
-| `TOKEN_ISSUER` | JWT token issuer | `dailiduzhou` |
-| `TOKEN_SUBJECT` | JWT token subject | `Billboard` |
-
-## Running the Server
-
-### Quick Start (Backend + Frontend)
-
-Use the provided start script to run both servers:
-
-```bash
-./start.sh
-```
-
-This will:
-- Start the backend server on `http://localhost:8080`
-- Start the frontend demo on `http://localhost:3000`
-- Open http://localhost:3000 in your browser
-
-### Backend Only
-
-```bash
-go run main.go
-```
-
-Server will start on `http://localhost:8080`
-
-## API Endpoints
-
-### GET /events
-
-Subscribe to real-time score board updates.
-
-**Query Parameters:**
-- `token` (required): JWT authentication token
-
-**Headers:**
-- `Authorization`: `Bearer <token>` (alternative to query param)
-- `Last-Event-ID`: Resume from last received message ID
-
-## Authentication
-
-Generate a JWT token using the utils package:
+There are two parts of the server. It is comprised of the message scheduler and a http handler function.
+The messaging system is started when running:
 
 ```go
-import "sse/utils"
-
-token, err := utils.GenerateToken(userID)
+func main() {
+	server := sse.New()
+}
 ```
 
-The token expires after 2 hours.
+To add a stream to this handler:
 
-## Example Client
-
-```javascript
-const eventSource = new EventSource('http://localhost:8080/events?token=YOUR_JWT_TOKEN');
-
-eventSource.onmessage = (event) => {
-    console.log('Message:', event.data);
-};
-
-eventSource.onerror = (error) => {
-    console.error('SSE error:', error);
-};
+```go
+func main() {
+	server := sse.New()
+	server.CreateStream("messages")
+}
 ```
 
-## Frontend Demo
+This creates a new stream inside of the scheduler. Seeing as there are no consumers, publishing a message to this channel will do nothing.
+Clients can connect to this stream once the http handler is started by specifying _stream_ as a url parameter, like so:
 
-A complete frontend demo is included using `event-source-polyfill` for cross-browser compatibility.
-
-### Setup Frontend
-
-```bash
-cd frontend
-npm install
+```
+http://server/events?stream=messages
 ```
 
-### Running the Demo
 
-**Option 1: Using the start script**
-```bash
-./start.sh
+In order to start the http server:
+
+```go
+func main() {
+	server := sse.New()
+
+	// Create a new Mux and set the handler
+	mux := http.NewServeMux()
+	mux.HandleFunc("/events", server.ServeHTTP)
+
+	http.ListenAndServe(":8080", mux)
+}
 ```
 
-**Option 2: Manual setup**
-Open `frontend/index.html` in a web browser:
+To publish messages to a stream:
 
-```bash
-# Serve with a local server (e.g., using Python)
-cd frontend
-python3 -m http.server 3000
+```go
+func main() {
+	server := sse.New()
+
+	// Publish a payload to the stream
+	server.Publish("messages", &sse.Event{
+		Data: []byte("ping"),
+	})
+}
 ```
 
-Then open http://localhost:3000 in your browser.
+Please note there must be a stream with the name you specify and there must be subscribers to that stream
 
-### Demo Features
+A way to detect disconnected clients:
 
-- **JWT Token Generation**: Generate tokens directly in the browser
-- **Real-time Connection**: Connect to SSE endpoint with authentication
-- **Message Display**: View all received messages with timestamps
-- **Connection Stats**: Track message count, last event ID, and connection time
-- **Auto-reconnection**: Resumes from last event ID on reconnection
+```go
+func main() {
+	server := sse.New()
 
-### Using event-source-polyfill
+	mux := http.NewServeMux()
+	mux.HandleFunc("/events", func(w http.ResponseWriter, r *http.Request) {
+		go func() {
+			// Received Browser Disconnection
+			<-r.Context().Done()
+			println("The client is disconnected here")
+			return
+		}()
 
-For better browser compatibility, especially in older browsers:
+		server.ServeHTTP(w, r)
+	})
 
-```javascript
-import { EventSourcePolyfill } from 'event-source-polyfill';
-
-const eventSource = new EventSourcePolyfill(
-    'http://localhost:8080/events?token=YOUR_JWT_TOKEN',
-    {
-        heartbeatTimeout: 30000,
-        withCredentials: true
-    }
-);
-
-eventSource.onmessage = (event) => {
-    console.log('Message:', event.data);
-    console.log('Last Event ID:', event.lastEventId);
-};
+	http.ListenAndServe(":8080", mux)
+}
 ```
 
-## Building
+#### Example Client
 
-```bash
-go build -o sse-server
+The client exposes a way to connect to an SSE server. The client can also handle multiple events under the same url.
+
+To create a new client:
+
+```go
+func main() {
+	client := sse.NewClient("http://server/events")
+}
 ```
 
-## Development
+To subscribe to an event stream, please use the Subscribe function. This accepts the name of the stream and a handler function:
 
-Run tests:
-```bash
-go test ./...
+```go
+func main() {
+	client := sse.NewClient("http://server/events")
+
+	client.Subscribe("messages", func(msg *sse.Event) {
+		// Got some data!
+		fmt.Println(msg.Data)
+	})
+}
 ```
 
-Build with optimizations:
-```bash
-go build -ldflags="-s -w" -o sse-server
+Please note that this function will block the current thread. You can run this function in a go routine.
+
+If you wish to have events sent to a channel, you can use SubscribeChan:
+
+```go
+func main() {
+	events := make(chan *sse.Event)
+
+	client := sse.NewClient("http://server/events")
+	client.SubscribeChan("messages", events)
+}
 ```
+
+#### HTTP client parameters
+
+To add additional parameters to the http client, such as disabling ssl verification for self signed certs, you can override the http client or update its options:
+
+```go
+func main() {
+	client := sse.NewClient("http://server/events")
+	client.Connection.Transport =  &http.Transport{
+		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+	}
+}
+```
+
+#### URL query parameters
+
+To set custom query parameters on the client or disable the stream parameter altogether:
+
+```go
+func main() {
+	client := sse.NewClient("http://server/events?search=example")
+
+	client.SubscribeRaw(func(msg *sse.Event) {
+		// Got some data!
+		fmt.Println(msg.Data)
+	})
+}
+```
+
+
+## Contributing
+
+Please read through our
+[contributing guidelines](CONTRIBUTING.md).
+Included are directions for opening issues, coding standards, and notes on
+development.
+
+Moreover, if your pull request contains patches or features, you must include
+relevant unit tests.
+
+## Versioning
+
+For transparency into our release cycle and in striving to maintain backward
+compatibility, this project is maintained under [the Semantic Versioning guidelines](http://semver.org/).
+
+## Copyright and License
+
+Code and documentation copyright since 2015 r3labs.io authors.
+
+Code released under
+[the Mozilla Public License Version 2.0](LICENSE).

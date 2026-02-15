@@ -1,0 +1,6 @@
+[package]
+name = "min_abs_num"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
