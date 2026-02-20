@@ -1,0 +1,12 @@
+# Protobuf generated files (in proto/ directory, use pb/ instead)
+proto/*.pb.go
+proto/*_grpc.pb.go
+
+# Build artifacts
+bin/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
