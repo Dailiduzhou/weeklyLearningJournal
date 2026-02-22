@@ -6,16 +6,16 @@ import (
 	"log/slog"
 	"time"
 
+	pb "stream_grpc/pb/proto"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	pb "stream_grpc/pb/proto"
 )
 
 func main() {
 	slog.Info("========== 客户端启动 ==========")
 
-	conn, err := grpc.DialContext(context.Background(), "127.0.0.1:50052",
-		grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient("127.0.0.1:50052", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		slog.Error("连接失败", slog.String("error", err.Error()))
 		return

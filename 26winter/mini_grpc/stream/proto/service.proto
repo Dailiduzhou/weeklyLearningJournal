@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+option go_package = "../pb";
+
+service TikerService {
+  rpc GetStockUpdates(StockRequest) returns (stream StockPrice) {}
+  rpc Chat(stream ChatMessage) returns (stream ChatMessage) {}
+}
+
+message StockRequest {
+  string symbol = 1;
+}
+
+message StockPrice {
+  string symbol = 1;
+  double price = 2;
+}
+
+message ChatMessage {
+  string user = 1;
+  string text = 2;
+}

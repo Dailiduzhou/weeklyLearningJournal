@@ -9,8 +9,9 @@ import (
 	"os/signal"
 	"time"
 
-	"google.golang.org/grpc"
 	pb "stream_grpc/pb/proto"
+
+	"google.golang.org/grpc"
 )
 
 type server struct {
@@ -65,7 +66,7 @@ func main() {
 	var lis net.Listener
 	var err error
 
-	for i := 0; i < 3; i++ {
+	for i := range 10 {
 		lis, err = net.Listen("tcp", port)
 		if err == nil {
 			break

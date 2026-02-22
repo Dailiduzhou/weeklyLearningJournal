@@ -182,7 +182,6 @@ func (c *Client) writePump() {
 			// log.Printf("Sent message to %s: %s", c.username, message.Type)
 
 		case <-ticker.C:
-			// [ADDED] 增加 SetWriteDeadline 错误检查
 			if err := c.conn.SetWriteDeadline(time.Now().Add(10 * time.Second)); err != nil {
 				log.Printf("SetWriteDeadline (Ping) error for %s: %v", c.username, err)
 				return
