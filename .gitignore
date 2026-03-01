@@ -3,9 +3,9 @@ Thumbs.db
 
 /.obsidian
 /temp
-/week3/image/beauty.jpg
-/week5/examples
-/week6/test
+/semester1/week3/image/beauty.jpg
+/semester1/week5/examples
+/semester1/week6/test
 
 target/
 **/*.rs.bk
@@ -495,5 +495,6 @@ $RECYCLE.BIN/
 # Vim temporary swap files
 *.swp
 
-26winter/grpc-go/
-26winter/sse/
+semester1/26winter/grpc-go/
+semester1/26winter/sse/
+.sisyphus/
