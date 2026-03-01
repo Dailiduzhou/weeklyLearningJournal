@@ -14,7 +14,7 @@ impl Solution {
             ('M', 1000),
         ];
 
-        let map: HashMap<_, _> = pair.into_iter().collect();
+        let map: HashMap<char, i32> = pair.into_iter().collect();
         let chars: Vec<char> = s.chars().collect();
         let n = s.len();
         let mut res = map[&chars[n - 1]];
