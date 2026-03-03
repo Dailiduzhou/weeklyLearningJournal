@@ -46,8 +46,9 @@ impl Solution1 {
         sub_root: Option<Rc<RefCell<TreeNode>>>,
     ) -> bool {
         use std::collections::VecDeque;
-        let sub_root = sub_root.unwrap();
-        let mut queue = VecDeque::new();
+
+        let sub_root: Rc<RefCell<TreeNode>> = sub_root.unwrap();
+        let mut queue: VecDeque<Rc<RefCell<TreeNode>>> = VecDeque::new();
         queue.push_back(root.unwrap());
 
         while let Some(node) = queue.pop_front() {
