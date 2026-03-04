@@ -31,7 +31,7 @@ struct Solution1;
 
 impl Solution1 {
     pub fn longest_consecutive(nums: Vec<i32>) -> i32 {
-        let num_set: HashSet<_> = nums.into_iter().collect();
+        let num_set: HashSet<i32> = nums.into_iter().collect();
         let mut ans = 0;
         for &num in &num_set {
             if !num_set.contains(&(num - 1)) {

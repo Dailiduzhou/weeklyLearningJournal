@@ -16,7 +16,7 @@ impl Solution {
     pub fn delete_duplicates(head: Option<Box<ListNode>>) -> Option<Box<ListNode>> {
         let mut dummy = Box::new(ListNode::new(0));
         dummy.next = head;
-        let mut prev = &mut dummy;
+        let mut prev: &mut Box<ListNode> = &mut dummy;
 
         while let Some(mut current) = prev.next.take() {
             let duplicate_found =
