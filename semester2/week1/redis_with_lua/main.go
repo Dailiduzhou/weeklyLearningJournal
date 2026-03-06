@@ -8,7 +8,6 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// 修复: 补上了 "del" 后的逗号
 var releaseScript = redis.NewScript(`
 	if redis.call("get", KEYS[1]) == ARGV[1] then
 		return redis.call("del", KEYS[1])
@@ -59,7 +58,6 @@ func main() {
 
 	fmt.Println("\n2. 尝试刷新锁的过期时间...")
 
-	// 修复: 传入了 lockToken 作为 ARGV[1], ttl.Milliseconds() 作为 ARGV[2]
 	refreshRes, err := refreshScript.Run(ctx, client, []string{lockKey}, lockToken, ttl.Milliseconds()).Int()
 	if err != nil {
 		fmt.Printf("刷新锁发生错误: %v\n", err)
