@@ -1,0 +1,50 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: forum-api
+    ports:
+      - "8080:8080"
+    environment:
+      - GIN_MODE=release
+    volumes:
+      - ./config.docker.yaml:/app/config.yaml:ro
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - forum-network
+    restart: unless-stopped
+
+  mongodb:
+    image: mongo:7.0-jammy
+    container_name: forum-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin123
+      - MONGO_INITDB_DATABASE=forum_db
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - forum-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  mongodb_data:
+    driver: local
+  mongodb_config:
+    driver: local
+
+networks:
+  forum-network:
+    driver: bridge

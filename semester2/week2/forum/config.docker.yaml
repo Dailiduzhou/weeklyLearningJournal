@@ -1,0 +1,12 @@
+server:
+  port: 8080
+  mode: release
+
+mongodb:
+  uri: "mongodb://admin:admin123@mongodb:27017"
+  database: "forum_db"
+
+jwt:
+  secret: "b77ae2f2de00a721b757840d38d804940cd3460185f279d1f87eeb182c578975"
+  expires_in: "24h"
+  issuer: "forum-api"

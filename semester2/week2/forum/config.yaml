@@ -1,0 +1,12 @@
+server:
+  port: 8080
+  mode: debug
+
+mongodb:
+  uri: "mongodb://localhost:27017"
+  database: "forum_db"
+
+jwt:
+  secret: "your-super-secret-key-change-in-production"
+  expires_in: "24h"
+  issuer: "forum-api"
