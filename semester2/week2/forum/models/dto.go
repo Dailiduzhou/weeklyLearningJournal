@@ -25,3 +25,20 @@ type UpdatePostDTO struct {
 type VoteDTO struct {
 	Action string `json:"action" binding:"required,oneof=up down"` // 只能是 up 或 down
 }
+
+// MessageResponse 通用消息响应
+type MessageResponse struct {
+	Message string `json:"message"`
+}
+
+// ErrorResponse 通用错误响应
+type ErrorResponse struct {
+	Error string `json:"error"`
+}
+
+// PostListResponse 帖子列表响应
+type PostListResponse struct {
+	Posts []Post `json:"posts"`
+	Page  int    `json:"page"`
+	Limit int    `json:"limit"`
+}

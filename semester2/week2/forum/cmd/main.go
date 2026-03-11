@@ -1,3 +1,11 @@
+// @title Forum API
+// @version 1.0
+// @description Forum backend API.
+// @BasePath /api
+// @schemes http
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 package main
 
 import (

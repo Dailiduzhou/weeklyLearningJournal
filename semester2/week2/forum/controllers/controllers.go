@@ -22,6 +22,18 @@ func NewAuthController(userService services.UserService) *AuthController {
 	}
 }
 
+// Register godoc
+// @Summary Register a new user
+// @Description Create a new account and return an auth token.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param payload body models.RegisterDTO true "Registration payload"
+// @Success 201 {object} models.AuthResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 409 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /auth/register [post]
 func (c *AuthController) Register(ctx *gin.Context) {
 	var dto models.RegisterDTO
 	if err := ctx.ShouldBindJSON(&dto); err != nil {
@@ -42,6 +54,18 @@ func (c *AuthController) Register(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, response)
 }
 
+// Login godoc
+// @Summary Login
+// @Description Authenticate with email and password, return an auth token.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param payload body models.LoginDTO true "Login payload"
+// @Success 200 {object} models.AuthResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 401 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /auth/login [post]
 func (c *AuthController) Login(ctx *gin.Context) {
 	var dto models.LoginDTO
 	if err := ctx.ShouldBindJSON(&dto); err != nil {
@@ -72,6 +96,18 @@ func NewPostController(postService services.PostService) *PostController {
 	}
 }
 
+// CreatePost godoc
+// @Summary Create a post
+// @Description Create a new post.
+// @Tags Posts
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param payload body models.CreatePostDTO true "Post payload"
+// @Success 201 {object} models.Post
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /posts [post]
 func (c *PostController) CreatePost(ctx *gin.Context) {
 	userID := ctx.GetString("userID")
 
@@ -90,6 +126,17 @@ func (c *PostController) CreatePost(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, post)
 }
 
+// GetPost godoc
+// @Summary Get a post
+// @Description Get a single post by ID.
+// @Tags Posts
+// @Security BearerAuth
+// @Produce json
+// @Param id path string true "Post ID"
+// @Success 200 {object} models.Post
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /posts/{id} [get]
 func (c *PostController) GetPost(ctx *gin.Context) {
 	postID := ctx.Param("id")
 
@@ -106,6 +153,17 @@ func (c *PostController) GetPost(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, post)
 }
 
+// GetPosts godoc
+// @Summary List posts
+// @Description Get a paginated list of posts.
+// @Tags Posts
+// @Security BearerAuth
+// @Produce json
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Page size" default(10)
+// @Success 200 {object} models.PostListResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /posts [get]
 func (c *PostController) GetPosts(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	limit, _ := strconv.Atoi(ctx.DefaultQuery("limit", "10"))
@@ -123,6 +181,21 @@ func (c *PostController) GetPosts(ctx *gin.Context) {
 	})
 }
 
+// UpdatePost godoc
+// @Summary Update a post
+// @Description Update an existing post by ID.
+// @Tags Posts
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param id path string true "Post ID"
+// @Param payload body models.UpdatePostDTO true "Update payload"
+// @Success 200 {object} models.MessageResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /posts/{id} [put]
 func (c *PostController) UpdatePost(ctx *gin.Context) {
 	userID := ctx.GetString("userID")
 	postID := ctx.Param("id")
@@ -150,6 +223,18 @@ func (c *PostController) UpdatePost(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": "post updated successfully"})
 }
 
+// DeletePost godoc
+// @Summary Delete a post
+// @Description Delete a post by ID.
+// @Tags Posts
+// @Security BearerAuth
+// @Produce json
+// @Param id path string true "Post ID"
+// @Success 200 {object} models.MessageResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /posts/{id} [delete]
 func (c *PostController) DeletePost(ctx *gin.Context) {
 	userID := ctx.GetString("userID")
 	postID := ctx.Param("id")
@@ -171,6 +256,20 @@ func (c *PostController) DeletePost(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": "post deleted successfully"})
 }
 
+// AddComment godoc
+// @Summary Add a comment
+// @Description Add a comment to a post.
+// @Tags Comments
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param id path string true "Post ID"
+// @Param payload body models.AddCommandDTO true "Comment payload"
+// @Success 201 {object} models.MessageResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /posts/{id}/comments [post]
 func (c *PostController) AddComment(ctx *gin.Context) {
 	userID := ctx.GetString("userID")
 	postID := ctx.Param("id")
@@ -194,6 +293,19 @@ func (c *PostController) AddComment(ctx *gin.Context) {
 	ctx.JSON(http.StatusCreated, gin.H{"message": "comment added successfully"})
 }
 
+// DeleteComment godoc
+// @Summary Delete a comment
+// @Description Delete a comment by ID.
+// @Tags Comments
+// @Security BearerAuth
+// @Produce json
+// @Param id path string true "Post ID"
+// @Param commentId path string true "Comment ID"
+// @Success 200 {object} models.MessageResponse
+// @Failure 403 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /posts/{id}/comments/{commentId} [delete]
 func (c *PostController) DeleteComment(ctx *gin.Context) {
 	userID := ctx.GetString("userID")
 	postID := ctx.Param("id")
@@ -216,6 +328,20 @@ func (c *PostController) DeleteComment(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": "comment deleted successfully"})
 }
 
+// VotePost godoc
+// @Summary Vote on a post
+// @Description Upvote or downvote a post.
+// @Tags Votes
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param id path string true "Post ID"
+// @Param payload body models.VoteDTO true "Vote payload"
+// @Success 200 {object} models.MessageResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /posts/{id}/vote [post]
 func (c *PostController) VotePost(ctx *gin.Context) {
 	userID := ctx.GetString("userID")
 	postID := ctx.Param("id")
@@ -247,6 +373,21 @@ func (c *PostController) VotePost(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": "vote recorded successfully"})
 }
 
+// VoteComment godoc
+// @Summary Vote on a comment
+// @Description Upvote or downvote a comment.
+// @Tags Votes
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param id path string true "Post ID"
+// @Param commentId path string true "Comment ID"
+// @Param payload body models.VoteDTO true "Vote payload"
+// @Success 200 {object} models.MessageResponse
+// @Failure 400 {object} models.ErrorResponse
+// @Failure 404 {object} models.ErrorResponse
+// @Failure 500 {object} models.ErrorResponse
+// @Router /posts/{id}/comments/{commentId}/vote [post]
 func (c *PostController) VoteComment(ctx *gin.Context) {
 	userID := ctx.GetString("userID")
 	postID := ctx.Param("id")
