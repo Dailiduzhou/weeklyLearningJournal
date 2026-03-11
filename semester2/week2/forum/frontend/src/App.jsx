@@ -462,14 +462,25 @@ const EndpointTester = ({ endpoint, apiSpec, globalToken, setGlobalToken, baseUr
       <div className="bg-slate-50 p-5 rounded-lg border border-slate-200">
         <div className="mb-4">
           <label className="block text-sm font-semibold text-slate-700 mb-1">Base URL (API Host)</label>
-          <input type="text" value={baseUrl} onChange={e => setBaseUrl(e.target.value)} className="w-full border-slate-300 rounded-md shadow-sm text-sm px-3 py-2 border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" />
+          <input
+            type="text"
+            value={baseUrl}
+            onChange={e => setBaseUrl(e.target.value)}
+            className="w-full border-slate-300 rounded-md shadow-sm text-sm px-3 py-2 border bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
         </div>
         {requiresAuth && (
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-1 flex items-center gap-2">
               <Lock className="w-4 h-4 text-amber-500" /> Bearer Token (自动携带)
             </label>
-            <input type="text" value={globalToken} onChange={e => setGlobalToken(e.target.value)} placeholder="在此粘贴您的 Token... (或先调用 Login 接口自动获取)" className="w-full border-slate-300 rounded-md shadow-sm text-sm px-3 py-2 border focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500" />
+            <input
+              type="text"
+              value={globalToken}
+              onChange={e => setGlobalToken(e.target.value)}
+              placeholder="在此粘贴您的 Token... (或先调用 Login 接口自动获取)"
+              className="w-full border-slate-300 rounded-md shadow-sm text-sm px-3 py-2 border bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+            />
           </div>
         )}
       </div>
@@ -490,7 +501,7 @@ const EndpointTester = ({ endpoint, apiSpec, globalToken, setGlobalToken, baseUr
                   onChange={e => p.in === 'path'
                     ? setPathParams({ ...pathParams, [p.name]: e.target.value })
                     : setQueryParams({ ...queryParams, [p.name]: e.target.value })}
-                  className="flex-1 border-slate-300 rounded-md shadow-sm text-sm px-3 py-2 border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="flex-1 border-slate-300 rounded-md shadow-sm text-sm px-3 py-2 border bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                   placeholder={p.description || `输入 ${p.name}`}
                 />
               </div>
@@ -506,7 +517,7 @@ const EndpointTester = ({ endpoint, apiSpec, globalToken, setGlobalToken, baseUr
             value={requestBody}
             onChange={e => setRequestBody(e.target.value)}
             rows={8}
-            className="w-full font-mono text-sm border-slate-300 rounded-md shadow-sm px-3 py-2 border focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            className="w-full font-mono text-sm border-slate-300 rounded-md shadow-sm px-3 py-2 border bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
       )}
