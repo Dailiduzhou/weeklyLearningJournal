@@ -1,6 +1,13 @@
 package di
 
-import "github.com/google/wire"
+import (
+	"pg_forum/config"
+	"pg_forum/controllers"
+	"pg_forum/repositories"
+	"pg_forum/services"
+
+	"github.com/google/wire"
+)
 
 var RepositorySet = wire.NewSet(
 	repositories.NewUserRepository,

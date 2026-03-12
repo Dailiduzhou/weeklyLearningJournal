@@ -1,0 +1,14 @@
+server:
+  port: 8080
+  mode: release
+
+postgres:
+  dsn: "host=postgres user=forum_user password=forum123 dbname=pg_forum port=5432 sslmode=disable TimeZone=UTC"
+  max_idle_conns: 10
+  max_open_conns: 50
+  conn_max_lifetime: "1h"
+
+jwt:
+  secret: "6b8e238ede23ac936c394fd4f614d6cb1600cc07eaebc88ed63f535530db13d4"
+  expires_in: "24h"
+  issuer: "pg-forum-api"

@@ -1,0 +1,47 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: pg-forum-api
+    ports:
+      - "8082:8080"
+    environment:
+      - GIN_MODE=release
+    volumes:
+      - ./config.docker.yaml:/app/config.yaml:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - pg-forum-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: pg-forum-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=forum_user
+      - POSTGRES_PASSWORD=forum123
+      - POSTGRES_DB=pg_forum
+    volumes:
+      - pg_forum_data:/var/lib/postgresql/data
+    networks:
+      - pg-forum-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forum_user -d pg_forum"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  pg_forum_data:
+    driver: local
+
+networks:
+  pg-forum-network:
+    driver: bridge
