@@ -1,0 +1,16 @@
+# Node
+node_modules/
+
+# Vite
+frontend/dist/
+frontend/.vite/
+
+# Env
+.env
+.env.*
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

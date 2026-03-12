@@ -199,6 +199,18 @@ docker-compose run -e GIN_MODE=debug app
 
 ### 方式一：Docker 部署（推荐）
 
+## 前端（React + Vite）
+
+前端源码位于 `frontend/`，提供 API 控制台与文档浏览界面。
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+默认通过 Vite 代理将 `/api` 请求转发到 `http://localhost:8080`。
+
 参见上方 [Docker 部署](#docker-部署推荐) 章节。
 
 ### 方式二：本地开发部署

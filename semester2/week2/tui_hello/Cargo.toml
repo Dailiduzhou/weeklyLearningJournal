@@ -1,8 +1,11 @@
 [package]
 name = "tui_hello"
 version = "0.1.0"
-description = "Nonsense"
-authors = ["Dailiduzhou <qzhsdream@163.com>"]
+<<<<<<< HEAD
+=======
+description = "hh"
+authors = ["Dailiduzhouxunren <qzhsdream@163.com>"]
+>>>>>>> origin/main
 license = "MIT"
 edition = "2024"
 
