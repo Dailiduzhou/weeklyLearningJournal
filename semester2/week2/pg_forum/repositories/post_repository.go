@@ -29,7 +29,7 @@ func (r *postRepository) FindByID(ctx context.Context, id string) (*models.Post,
 	var post models.Post
 	err := r.db.WithContext(ctx).
 		Preload("Comments", func(db *gorm.DB) *gorm.DB {
-			return db.Order("created_at asc")
+			return db.Order("path asc")
 		}).
 		First(&post, "id = ?", id).Error
 	if err != nil {
@@ -51,7 +51,7 @@ func (r *postRepository) FindAll(ctx context.Context, page, limit int) ([]models
 		Limit(limit).
 		Offset(skip).
 		Preload("Comments", func(db *gorm.DB) *gorm.DB {
-			return db.Order("created_at asc")
+			return db.Order("path asc")
 		}).
 		Find(&posts).Error
 	if err != nil {
@@ -71,7 +71,7 @@ func (r *postRepository) FindByAuthor(ctx context.Context, authorID string, page
 		Limit(limit).
 		Offset(skip).
 		Preload("Comments", func(db *gorm.DB) *gorm.DB {
-			return db.Order("created_at asc")
+			return db.Order("path asc")
 		}).
 		Find(&posts).Error
 	if err != nil {
@@ -81,7 +81,7 @@ func (r *postRepository) FindByAuthor(ctx context.Context, authorID string, page
 	return posts, nil
 }
 
-func (r *postRepository) Update(ctx context.Context, id string, update map[string]interface{}) error {
+func (r *postRepository) Update(ctx context.Context, id string, update map[string]any) error {
 	update["updated_at"] = time.Now()
 
 	result := r.db.WithContext(ctx).
