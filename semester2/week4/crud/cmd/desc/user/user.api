@@ -1,0 +1,61 @@
+syntax = "v1"
+
+type User {
+	ID       int64  `json:"id"`
+	Username string `json:"username"`
+	Password string `json:"-"`
+	Role     string `json:"role,options=user|admin"`
+}
+
+type (
+	RegisterRequest {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	RegisterResp {
+		Username string `json:"username"`
+	}
+)
+
+type (
+	LoginRequest {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	LoginResp {
+		Username string `json:"username"`
+	}
+)
+
+type (
+	UserInfoRequest {
+		ID int64 `path:"id"`
+	}
+	UserInfoResp {
+		ID       int64  `json:"id"`
+		Username string `json:"username"`
+		Role     string `json:"role"`
+	}
+)
+
+type (
+	UpdateUserRequest {
+		ID       int64  `json:"id"`
+		Username string `json:"username"`
+	}
+	UpdateUserResp {
+		ID       int64  `json:"id"`
+		Username string `json:"username"`
+	}
+)
+
+type (
+	DeleteUserRequest {
+		ID int64 `path:"id"`
+	}
+	DeleteUserResp {
+		ID       int64  `json:"id"`
+		Username string `json:"id"`
+	}
+)
+

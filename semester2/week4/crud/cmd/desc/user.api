@@ -1,0 +1,47 @@
+syntax = "v1"
+
+import (
+	"user/user.api"
+)
+
+@server (
+	prefix: api/v1
+	group:  user
+)
+service user {
+	@doc "Register"
+	@handler register
+	post /user/register (RegisterRequest) returns (RegisterResp)
+
+	@doc "Login"
+	@handler login
+	post /user/register (LoginRequest) returns (LoginResp)
+}
+
+@server (
+	prefix: api/v1
+	group:  user
+	jwt:    JwtAuth
+)
+service user {
+	@doc "Get users's info"
+	@handler detail
+	get /user/:id (UserInfoReq) returns (UserInfoResp)
+
+	@doc "Update user's profile"
+	@handler Update
+	post /user/update (UpdateUserRequest) returns (UpdateUserResp)
+}
+
+@server (
+	prefix:     api/v1/admin
+	jwt:        JwtAuth
+	group:      user
+	middleware: AdminMiddleware
+)
+service user {
+	@doc "Delete a user"
+	@handler Delete
+	post /user/:id (DeleteUserRequest) returns (DeleteUserResp)
+}
+
