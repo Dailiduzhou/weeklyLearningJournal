@@ -8,7 +8,9 @@ import (
 
 	"crud/cmd/internal/svc"
 	"crud/cmd/internal/types"
+	"crud/cmd/model"
 
+	"github.com/zeromicro/go-zero/core/errorx"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -28,7 +30,21 @@ func NewDeleteLogic(ctx context.Context, svcCtx *svc.ServiceContext) *DeleteLogi
 }
 
 func (l *DeleteLogic) Delete(req *types.DeleteUserRequest) (resp *types.DeleteUserResp, err error) {
-	// todo: add your logic here and delete this line
+	user, err := l.svcCtx.UserModel.FindOne(l.ctx, req.ID)
+	if err != nil {
+		if err == model.ErrNotFound {
+			return nil, errorx.Wrapf(nil, "用户不存在")
+		}
+		return nil, errorx.Wrapf(err, "查询用户失败")
+	}
 
-	return
+	err = l.svcCtx.UserModel.Delete(l.ctx, req.ID)
+	if err != nil {
+		return nil, errorx.Wrapf(err, "删除用户失败")
+	}
+
+	return &types.DeleteUserResp{
+		ID:       user.Id,
+		Username: user.Username,
+	}, nil
 }

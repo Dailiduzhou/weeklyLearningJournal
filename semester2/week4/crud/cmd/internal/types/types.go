@@ -18,7 +18,9 @@ type LoginRequest struct {
 }
 
 type LoginResp struct {
-	Username string `json:"username"`
+	Username     string `json:"username"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
 }
 
 type RefreshRequest struct {

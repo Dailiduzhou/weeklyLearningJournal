@@ -15,7 +15,7 @@ service user {
 
 	@doc "Login"
 	@handler login
-	post /user/register (LoginRequest) returns (LoginResp)
+	post /user/login (LoginRequest) returns (LoginResp)
 
 	@doc "Refresh token"
 	@handler Refresh

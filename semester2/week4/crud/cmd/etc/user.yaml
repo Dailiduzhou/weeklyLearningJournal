@@ -1,3 +1,21 @@
 Name: user
 Host: 0.0.0.0
 Port: 8888
+
+Auth:
+  AccessSecret: "78f4997171216f64c2fc369f653e030f3d25fba170cd460d4a415b6d646b5d1c" # 访问令牌秘钥 (建议由大小写字母+数字组成的强密码)
+  AccessExpire: 3600                            # 访问令牌过期时间(秒)，例如 1 小时 = 3600
+  RefreshSecret: "1c539e2705b32e7c06c8bdac5d8aa47bf33439b701303c2b08dcb3f4ed52cfbd" # 刷新令牌秘钥 (💥 强烈建议与 AccessSecret 不同)
+  RefreshExpire: 604800                         # 刷新令牌过期时间(秒)，例如 7 天 = 604800
+
+DB:
+  DataSource: "postgres://postgres:123456@127.0.0.1:5432/mydb?sslmode=disable"
+
+Cache:
+  - Host: 127.0.0.1:6379
+    Pass: ""
+
+BizRedis:
+  Host: 127.0.0.1:6379
+  Pass: ""
+  Type: node # node 表示单节点，cluster 表示集群

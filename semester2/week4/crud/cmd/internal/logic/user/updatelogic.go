@@ -8,7 +8,9 @@ import (
 
 	"crud/cmd/internal/svc"
 	"crud/cmd/internal/types"
+	"crud/cmd/model"
 
+	"github.com/zeromicro/go-zero/core/errorx"
 	"github.com/zeromicro/go-zero/core/logx"
 )
 
@@ -28,7 +30,47 @@ func NewUpdateLogic(ctx context.Context, svcCtx *svc.ServiceContext) *UpdateLogi
 }
 
 func (l *UpdateLogic) Update(req *types.UpdateUserRequest) (resp *types.UpdateUserResp, err error) {
-	// todo: add your logic here and delete this line
+	userIDVal := l.ctx.Value("ID")
+	if userIDVal == nil {
+		return nil, errorx.Wrapf(nil, "未授权")
+	}
 
-	return
+	userID, ok := userIDVal.(float64)
+	if !ok {
+		return nil, errorx.Wrapf(nil, "用户ID格式错误")
+	}
+
+	if int64(userID) != req.ID {
+		return nil, errorx.Wrapf(nil, "只能修改自己的资料")
+	}
+
+	user, err := l.svcCtx.UserModel.FindOne(l.ctx, req.ID)
+	if err != nil {
+		if err == model.ErrNotFound {
+			return nil, errorx.Wrapf(nil, "用户不存在")
+		}
+		return nil, errorx.Wrapf(err, "查询用户失败")
+	}
+
+	if user.Username != req.Username {
+		_, err = l.svcCtx.UserModel.FindOneByUsername(l.ctx, req.Username)
+		if err == nil {
+			return nil, errorx.Wrapf(nil, "用户名已存在")
+		}
+		if err != model.ErrNotFound {
+			return nil, errorx.Wrapf(err, "查询用户失败")
+		}
+	}
+
+	user.Username = req.Username
+
+	err = l.svcCtx.UserModel.Update(l.ctx, user)
+	if err != nil {
+		return nil, errorx.Wrapf(err, "更新用户失败")
+	}
+
+	return &types.UpdateUserResp{
+		ID:       user.Id,
+		Username: user.Username,
+	}, nil
 }
