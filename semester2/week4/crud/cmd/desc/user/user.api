@@ -28,6 +28,16 @@ type (
 )
 
 type (
+	RefreshRequest {
+		RefreshToken string `json:"refresh_token"`
+	}
+	RefreshResp {
+		AccessToken  string `json:"access_token"`
+		RefreshToken string `json:"refresh_token"`
+	}
+)
+
+type (
 	UserInfoRequest {
 		ID int64 `path:"id"`
 	}

@@ -16,6 +16,10 @@ service user {
 	@doc "Login"
 	@handler login
 	post /user/register (LoginRequest) returns (LoginResp)
+
+	@doc "Refresh token"
+	@handler Refresh
+	post /user/refresh (RefreshRequest) returns (RefreshResp)
 }
 
 @server (
@@ -26,7 +30,7 @@ service user {
 service user {
 	@doc "Get users's info"
 	@handler detail
-	get /user/:id (UserInfoReq) returns (UserInfoResp)
+	get /user/:id (UserInfoRequest) returns (UserInfoResp)
 
 	@doc "Update user's profile"
 	@handler Update
