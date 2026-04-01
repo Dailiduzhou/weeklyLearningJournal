@@ -1,17 +1,22 @@
-# Build stage
-FROM golang:alpine AS builder
+# Dockerfile with build arguments for flexibility
+FROM golang:1.24-alpine AS builder
+
+ARG GOPROXY=https://goproxy.cn,direct
+ARG GO111MODULE=on
 
 WORKDIR /build
 
 # Install build dependencies
 RUN apk add --no-cache git gcc musl-dev
 
-# Set Go proxy for faster downloads (especially in China)
-ENV GOPROXY=https://goproxy.cn,direct
-ENV GO111MODULE=on
+# Set environment variables
+ENV GOPROXY=${GOPROXY}
+ENV GO111MODULE=${GO111MODULE}
 
-# Copy dependency files first for better caching
+# Copy dependency files first
 COPY go.mod go.sum ./
+
+# Download dependencies
 RUN go mod download
 
 # Copy source code

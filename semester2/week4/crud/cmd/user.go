@@ -11,6 +11,7 @@ import (
 	"crud/cmd/internal/handler"
 	"crud/cmd/internal/svc"
 
+	_ "github.com/lib/pq"
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/rest"
 )

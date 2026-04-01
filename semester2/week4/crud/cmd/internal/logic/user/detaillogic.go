@@ -5,6 +5,7 @@ package user
 
 import (
 	"context"
+	"encoding/json"
 
 	"crud/cmd/internal/svc"
 	"crud/cmd/internal/types"
@@ -30,27 +31,46 @@ func NewDetailLogic(ctx context.Context, svcCtx *svc.ServiceContext) *DetailLogi
 }
 
 func (l *DetailLogic) Detail(req *types.UserInfoRequest) (resp *types.UserInfoResp, err error) {
+	logx.Infof("Detail 请求: userID=%d", req.ID)
+
 	userIDVal := l.ctx.Value("ID")
+	logx.Infof("Context 中的 ID: %v, 类型: %T", userIDVal, userIDVal)
+
 	if userIDVal == nil {
+		logx.Error("Context 中没有 ID，可能 JWT 中间件未正确工作")
 		return nil, errorx.Wrapf(nil, "未授权")
 	}
 
-	userID, ok := userIDVal.(float64)
+	userIDNum, ok := userIDVal.(json.Number)
 	if !ok {
+		logx.Errorf("ID 类型断言失败，实际类型: %T", userIDVal)
+		return nil, errorx.Wrapf(nil, "用户ID格式错误")
+	}
+
+	userID, err := userIDNum.Int64()
+	if err != nil {
+		logx.Errorf("ID 转换失败: %v", err)
 		return nil, errorx.Wrapf(nil, "用户ID格式错误")
 	}
 
 	roleVal := l.ctx.Value("Role")
+	logx.Infof("Context 中的 Role: %v, 类型: %T", roleVal, roleVal)
+
 	if roleVal == nil {
+		logx.Error("Context 中没有 Role")
 		return nil, errorx.Wrapf(nil, "未授权")
 	}
 
 	role, ok := roleVal.(string)
 	if !ok {
+		logx.Errorf("Role 类型断言失败，实际类型: %T", roleVal)
 		return nil, errorx.Wrapf(nil, "用户角色格式错误")
 	}
 
-	if role != "admin" && int64(userID) != req.ID {
+	logx.Infof("权限检查: role=%s, userID=%d, req.ID=%d", role, userID, req.ID)
+
+	if role != "admin" && userID != req.ID {
+		logx.Error("权限不足")
 		return nil, errorx.Wrapf(nil, "无权查看该用户信息")
 	}
 
@@ -61,6 +81,8 @@ func (l *DetailLogic) Detail(req *types.UserInfoRequest) (resp *types.UserInfoRe
 		}
 		return nil, errorx.Wrapf(err, "查询用户失败")
 	}
+
+	logx.Infof("查询成功: user=%+v", user)
 
 	return &types.UserInfoResp{
 		ID:       user.Id,

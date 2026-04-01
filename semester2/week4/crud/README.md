@@ -275,11 +275,12 @@ CREATE INDEX idx_user ON "user"(username);
 
 ## 📝 开发注意事项
 
-1. **JWT 密钥安全**: 生产环境必须使用强密钥（256位）
-2. **密钥分离**: Access 和 Refresh Token 必须使用不同密钥
-3. **HTTPS**: 生产环境必须启用 HTTPS
-4. **数据库迁移**: 使用数据库迁移工具管理 schema 变更
-5. **日志监控**: 配置日志收集和监控系统
+1. **PostgreSQL 驱动**: 项目使用 `github.com/lib/pq` 驱动，已在 `cmd/user.go` 中导入
+2. **JWT 密钥安全**: 生产环境必须使用强密钥（256位）
+3. **密钥分离**: Access 和 Refresh Token 必须使用不同密钥
+4. **HTTPS**: 生产环境必须启用 HTTPS
+5. **数据库迁移**: 使用数据库迁移工具管理 schema 变更
+6. **日志监控**: 配置日志收集和监控系统
 
 ## 🚀 生产部署建议
 

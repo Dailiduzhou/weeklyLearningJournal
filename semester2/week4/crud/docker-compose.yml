@@ -38,6 +38,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        GOPROXY: https://goproxy.cn,direct
     container_name: user_app
     ports:
       - "8888:8888"
