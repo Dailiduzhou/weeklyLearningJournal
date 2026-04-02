@@ -71,3 +71,11 @@ type (
 	}
 )
 
+type (
+	DebugRequest {
+	}
+	DebugResp {
+		Message string `json:"message"`
+	}
+)
+

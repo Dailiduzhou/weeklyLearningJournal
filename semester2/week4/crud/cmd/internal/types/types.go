@@ -3,6 +3,13 @@
 
 package types
 
+type DebugRequest struct {
+}
+
+type DebugResp struct {
+	Message string `json:"message"`
+}
+
 type DeleteUserRequest struct {
 	ID int64 `path:"id"`
 }

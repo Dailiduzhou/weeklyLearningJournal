@@ -20,6 +20,10 @@ service user {
 	@doc "Refresh token"
 	@handler Refresh
 	post /user/refresh (RefreshRequest) returns (RefreshResp)
+
+	@doc "Debug endpoint"
+	@handler debug
+	get /debug (DebugRequest) returns (DebugResp)
 }
 
 @server (

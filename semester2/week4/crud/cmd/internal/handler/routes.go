@@ -16,6 +16,12 @@ func RegisterHandlers(server *rest.Server, serverCtx *svc.ServiceContext) {
 	server.AddRoutes(
 		[]rest.Route{
 			{
+				// Debug endpoint
+				Method:  http.MethodGet,
+				Path:    "/debug",
+				Handler: user.DebugHandler(serverCtx),
+			},
+			{
 				// Login
 				Method:  http.MethodPost,
 				Path:    "/user/login",
