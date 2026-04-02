@@ -22,7 +22,10 @@ func main() {
 	config.Producer.Return.Successes = true
 	config.Producer.Return.Errors = true
 
-	broker := []string{"localhost:9092"}
+	broker := []string{os.Getenv("KAFKA_BROKERS")}
+	if broker[0] == "" {
+		broker = []string{"localhost:9092"}
+	}
 	producer, err := sarama.NewAsyncProducer(broker, config)
 	if err != nil {
 		log.Printf("Connot init producer")
