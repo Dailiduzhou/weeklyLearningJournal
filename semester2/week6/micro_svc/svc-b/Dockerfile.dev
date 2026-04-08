@@ -1,0 +1,45 @@
+# 开发环境 Dockerfile
+# 使用 alpine 基础镜像，包含基础工具，避免 scratch 的证书问题
+# 注意：此 Dockerfile 会完全替换 go.mod，移除所有本地 replace
+
+FROM golang:1.24-alpine AS builder
+
+ENV CGO_ENABLED=0
+ENV GOOS=linux
+ENV GOARCH=amd64
+
+WORKDIR /build
+
+# 安装 git
+RUN apk add --no-cache git
+
+# 复制源码（先不复制 go.mod，手动创建干净的）
+COPY . .
+
+# 创建干净的 go.mod（移除所有 replace）
+RUN go mod edit -dropreplace=github.com/zeromicro/go-zero 2>/dev/null || true && \
+    go mod tidy
+
+# 构建
+RUN go build -ldflags="-s -w" -o /app/server .
+
+# 运行阶段 - 使用 alpine 而非 scratch，避免 CA 证书问题
+FROM alpine:3.19
+
+# 安装基础工具（开发调试需要）
+RUN apk add --no-cache ca-certificates tzdata curl
+
+# 设置时区
+ENV TZ=Asia/Shanghai
+
+WORKDIR /app
+
+# 复制二进制和配置
+COPY --from=builder /app/server /app/server
+COPY ./etc /app/etc
+
+# 暴露端口（会被 docker-compose 覆盖）
+EXPOSE 8080
+
+# 启动命令（会被 docker-compose 覆盖）
+CMD ["/app/server", "-f", "/app/etc/pb.yaml"]

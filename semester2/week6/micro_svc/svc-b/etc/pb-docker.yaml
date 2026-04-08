@@ -1,0 +1,6 @@
+Name: b.rpc
+ListenOn: 0.0.0.0:8080
+Etcd:
+  Hosts:
+  - etcd:2379
+  Key: b.rpc

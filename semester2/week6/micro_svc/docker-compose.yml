@@ -1,0 +1,102 @@
+version: '3.8'
+
+services:
+  # etcd 服务发现和配置中心
+  etcd:
+    image: bitnami/etcd:3.5
+    container_name: micro-etcd
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+    ports:
+      - "2379:2379"
+      - "2380:2380"
+    volumes:
+      - etcd-data:/bitnami/etcd
+    networks:
+      - micro-network
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 服务 B - 基础服务
+  svc-b:
+    build:
+      context: ./svc-b
+      dockerfile: Dockerfile.dev
+    container_name: micro-svc-b
+    depends_on:
+      etcd:
+        condition: service_healthy
+    environment:
+      - TZ=Asia/Shanghai
+    # 端口不映射到主机，只在容器网络内访问
+    expose:
+      - "8080"
+    volumes:
+      # 挂载开发环境配置
+      - ./svc-b/etc/pb.yaml:/app/etc/pb.yaml:ro
+    networks:
+      - micro-network
+    command: ["/app/server", "-f", "/app/etc/pb.yaml"]
+    restart: unless-stopped
+
+  # 服务 A - 调用服务B
+  svc-a:
+    build:
+      context: ./svc-a
+      dockerfile: Dockerfile.dev
+    container_name: micro-svc-a
+    depends_on:
+      etcd:
+        condition: service_healthy
+      svc-b:
+        condition: service_started
+    environment:
+      - TZ=Asia/Shanghai
+    # 端口不映射到主机，只在容器网络内访问
+    expose:
+      - "9001"
+    volumes:
+      # 挂载开发环境配置（使用docker-compose内部网络地址）
+      - ./svc-a/etc/pb-docker.yaml:/app/etc/pb.yaml:ro
+    networks:
+      - micro-network
+    command: ["/app/server", "-f", "/app/etc/pb.yaml"]
+    restart: unless-stopped
+
+  # API 网关
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile.dev
+    container_name: micro-gateway
+    depends_on:
+      etcd:
+        condition: service_healthy
+      svc-a:
+        condition: service_started
+    environment:
+      - TZ=Asia/Shanghai
+    # 只暴露网关端口到主机
+    ports:
+      - "8888:8888"
+    volumes:
+      # 挂载开发环境配置
+      - ./gateway/etc/gateway-docker.yaml:/app/etc/gateway.yaml:ro
+    networks:
+      - micro-network
+    command: ["/app/server", "-f", "/app/etc/gateway.yaml"]
+    restart: unless-stopped
+
+volumes:
+  etcd-data:
+    driver: local
+
+networks:
+  micro-network:
+    driver: bridge

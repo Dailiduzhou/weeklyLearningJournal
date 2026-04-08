@@ -1,0 +1,12 @@
+syntax = "proto3";
+package pb;
+option go_package = "./pb";
+
+message CallAReq {}
+message CallAResp {
+  string msg = 1;
+}
+
+service A {
+  rpc CallA(CallAReq) returns(CallAResp);
+}

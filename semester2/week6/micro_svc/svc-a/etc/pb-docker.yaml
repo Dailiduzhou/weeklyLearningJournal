@@ -1,0 +1,12 @@
+Name: a.rpc
+ListenOn: 0.0.0.0:9001
+Etcd:
+  Hosts:
+  - etcd:2379
+  Key: a.rpc
+# 配置 B 服务的发现路径 (从 etcd 获取)
+BRpc:
+  Etcd:
+    Hosts:
+    - etcd:2379
+    Key: b.rpc

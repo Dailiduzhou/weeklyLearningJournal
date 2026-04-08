@@ -1,0 +1,14 @@
+Name: gateway
+Host: 0.0.0.0
+Port: 8888
+Upstreams:
+  - Name: a-service
+    Grpc:
+      Etcd:
+        Hosts:
+          - etcd:2379
+        Key: a.rpc
+    Mappings:
+      - Method: GET
+        Path: /api/a/call
+        RpcPath: pb.A/CallA

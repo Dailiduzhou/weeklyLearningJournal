@@ -1,0 +1,12 @@
+syntax = "proto3";
+package pb;
+option go_package = "./pb";
+
+message PingReq {}
+message PingResp {
+  string msg = 1;
+}
+
+service B {
+  rpc Ping(PingReq) returns(PingResp);
+}
