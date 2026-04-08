@@ -160,9 +160,8 @@ func (m *customUserModel) FindOneByEmail(ctx context.Context, email string) (*Us
         },
         func(ctx context.Context, conn sqlx.SqlConn, v any) (any, error) {
             query := fmt.Sprintf("select id from %s where email = $1 limit 1", m.table)
-            var result struct{ Id int64 }
-            if err := conn.QueryRowCtx(ctx, &result, query, email); err != nil {
-                return nil, err
+            if err := conn.QueryRowCtx(ctx, v, query, email); err != nil {
+                return v.(*User).Id, err
             }
             return result.Id, nil
         },
