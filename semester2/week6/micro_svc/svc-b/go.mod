@@ -1,6 +1,6 @@
-module github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-b
+module svc-b
 
-go 1.24.0
+go 1.23
 
 require (
 	github.com/zeromicro/go-zero v1.10.1
@@ -97,5 +97,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
-
-replace github.com/zeromicro/go-zero => /home/mikufan/code/go-zero

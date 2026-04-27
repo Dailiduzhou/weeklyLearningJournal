@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-b/internal/logic"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-b/internal/svc"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-b/pb"
+	"svc-b/internal/logic"
+	"svc-b/internal/svc"
+	"svc-b/pb"
 )
 
 type BServer struct {

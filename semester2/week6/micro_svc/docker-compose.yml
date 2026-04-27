@@ -26,8 +26,8 @@ services:
   # 服务 B - 基础服务
   svc-b:
     build:
-      context: ./svc-b
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: svc-b/Dockerfile.dev
     container_name: micro-svc-b
     depends_on:
       etcd:
@@ -48,8 +48,8 @@ services:
   # 服务 A - 调用服务B
   svc-a:
     build:
-      context: ./svc-a
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: svc-a/Dockerfile.dev
     container_name: micro-svc-a
     depends_on:
       etcd:
@@ -72,8 +72,8 @@ services:
   # API 网关
   gateway:
     build:
-      context: ./gateway
-      dockerfile: Dockerfile.dev
+      context: .
+      dockerfile: gateway/Dockerfile.dev
     container_name: micro-gateway
     depends_on:
       etcd:

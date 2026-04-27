@@ -4,10 +4,10 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-b/internal/config"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-b/internal/server"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-b/internal/svc"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-b/pb"
+	"svc-b/internal/config"
+	"svc-b/internal/server"
+	"svc-b/internal/svc"
+	"svc-b/pb"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"

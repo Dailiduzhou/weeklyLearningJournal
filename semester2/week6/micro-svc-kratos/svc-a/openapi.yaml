@@ -1,0 +1,29 @@
+# Generated with protoc-gen-openapi
+# https://github.com/google/gnostic/tree/master/cmd/protoc-gen-openapi
+
+openapi: 3.0.3
+info:
+    title: A API
+    version: 0.0.1
+paths:
+    /ping:
+        get:
+            tags:
+                - A
+            operationId: A_Ping
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/helloworld.v1.PingResp'
+components:
+    schemas:
+        helloworld.v1.PingResp:
+            type: object
+            properties:
+                msg:
+                    type: string
+tags:
+    - name: A

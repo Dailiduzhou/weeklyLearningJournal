@@ -1,45 +1,39 @@
-# 开发环境 Dockerfile
-# 使用 alpine 基础镜像，包含基础工具，避免 scratch 的证书问题
-# 注意：此 Dockerfile 会完全替换 go.mod，移除所有本地 replace
+# 开发环境 Dockerfile - 从项目根目录构建
+# 构建命令: docker build -f gateway/Dockerfile.dev .
 
 FROM golang:1.24-alpine AS builder
 
 ENV CGO_ENABLED=0
 ENV GOOS=linux
 ENV GOARCH=amd64
-
+ENV GOPROXY=https://goproxy.cn,direct
 WORKDIR /build
 
-# 安装 git
-RUN apk add --no-cache git
+COPY gateway/go.mod gateway/go.sum ./gateway/
+# 切换到 gateway 目录进行构建
+WORKDIR /build/gateway
 
-# 复制源码（先不复制 go.mod，手动创建干净的）
-COPY . .
+# 下载依赖并构建
+RUN go mod download
 
-# 创建干净的 go.mod（移除所有 replace）
-RUN go mod edit -dropreplace=github.com/zeromicro/go-zero 2>/dev/null || true && \
-    go mod tidy
+COPY gateway .
 
-# 构建
+RUN go mod tidy
+
 RUN go build -ldflags="-s -w" -o /app/server gateway.go
 
-# 运行阶段 - 使用 alpine 而非 scratch，避免 CA 证书问题
+# 运行阶段
 FROM alpine:3.19
 
-# 安装基础工具（开发调试需要）
-RUN apk add --no-cache ca-certificates tzdata curl
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
+  apk add --no-cache ca-certificates tzdata curl
 
-# 设置时区
 ENV TZ=Asia/Shanghai
 
 WORKDIR /app
 
-# 复制二进制和配置
 COPY --from=builder /app/server /app/server
-COPY ./etc /app/etc
 
-# 暴露端口（会被 docker-compose 覆盖）
 EXPOSE 8888
 
-# 启动命令（会被 docker-compose 覆盖）
 CMD ["/app/server", "-f", "/app/etc/gateway.yaml"]

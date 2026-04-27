@@ -1,4 +1,4 @@
-module github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/gateway
+module gateway
 
 go 1.24.0
 
@@ -107,5 +107,3 @@ require (
 	sigs.k8s.io/structured-merge-diff/v6 v6.3.0 // indirect
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
-
-replace github.com/zeromicro/go-zero => /home/mikufan/code/go-zero

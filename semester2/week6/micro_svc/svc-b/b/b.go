@@ -7,7 +7,7 @@ package b
 import (
 	"context"
 
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-b/pb"
+	"svc-b/pb"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"

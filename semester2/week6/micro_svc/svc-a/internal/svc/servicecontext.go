@@ -1,8 +1,8 @@
 package svc
 
 import (
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-a/internal/config"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-b/b"
+	"svc-a/internal/config"
+	"svc-b/b"
 	"github.com/zeromicro/go-zero/zrpc"
 )
 

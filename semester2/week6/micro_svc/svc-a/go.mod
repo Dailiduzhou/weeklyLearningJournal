@@ -1,12 +1,12 @@
-module github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-a
+module svc-a
 
-go 1.24.0
+go 1.23
 
 require (
-	github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-b v0.0.0
 	github.com/zeromicro/go-zero v1.10.1
 	google.golang.org/grpc v1.79.3
 	google.golang.org/protobuf v1.36.11
+	svc-b v0.0.0
 )
 
 require (
@@ -99,7 +99,4 @@ require (
 	sigs.k8s.io/yaml v1.6.0 // indirect
 )
 
-replace (
-	github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-b => ../svc-b
-	github.com/zeromicro/go-zero => /home/mikufan/code/go-zero
-)
+replace svc-b => ../svc-b

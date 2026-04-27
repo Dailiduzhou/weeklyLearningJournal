@@ -3,8 +3,8 @@ package logic
 import (
 	"context"
 
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-b/internal/svc"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week6/micro_svc/svc-b/pb"
+	"svc-b/internal/svc"
+	"svc-b/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
 )
