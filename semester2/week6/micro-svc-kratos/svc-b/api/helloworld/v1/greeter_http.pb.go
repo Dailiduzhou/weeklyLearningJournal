@@ -20,14 +20,17 @@ var _ = binding.EncodeURL
 const _ = http.SupportPackageIsVersion1
 
 const OperationBPing = "/helloworld.v1.B/Ping"
+const OperationBPong = "/helloworld.v1.B/Pong"
 
 type BHTTPServer interface {
 	Ping(context.Context, *PingReq) (*PingResp, error)
+	Pong(context.Context, *PongReq) (*PongResp, error)
 }
 
 func RegisterBHTTPServer(s *http.Server, srv BHTTPServer) {
 	r := s.Route("/")
 	r.GET("/ping", _B_Ping0_HTTP_Handler(srv))
+	r.GET("/pong", _B_Pong0_HTTP_Handler(srv))
 }
 
 func _B_Ping0_HTTP_Handler(srv BHTTPServer) func(ctx http.Context) error {
@@ -49,8 +52,28 @@ func _B_Ping0_HTTP_Handler(srv BHTTPServer) func(ctx http.Context) error {
 	}
 }
 
+func _B_Pong0_HTTP_Handler(srv BHTTPServer) func(ctx http.Context) error {
+	return func(ctx http.Context) error {
+		var in PongReq
+		if err := ctx.BindQuery(&in); err != nil {
+			return err
+		}
+		http.SetOperation(ctx, OperationBPong)
+		h := ctx.Middleware(func(ctx context.Context, req interface{}) (interface{}, error) {
+			return srv.Pong(ctx, req.(*PongReq))
+		})
+		out, err := h(ctx, &in)
+		if err != nil {
+			return err
+		}
+		reply := out.(*PongResp)
+		return ctx.Result(200, reply)
+	}
+}
+
 type BHTTPClient interface {
 	Ping(ctx context.Context, req *PingReq, opts ...http.CallOption) (rsp *PingResp, err error)
+	Pong(ctx context.Context, req *PongReq, opts ...http.CallOption) (rsp *PongResp, err error)
 }
 
 type BHTTPClientImpl struct {
@@ -66,6 +89,19 @@ func (c *BHTTPClientImpl) Ping(ctx context.Context, in *PingReq, opts ...http.Ca
 	pattern := "/ping"
 	path := binding.EncodeURL(pattern, in, true)
 	opts = append(opts, http.Operation(OperationBPing))
+	opts = append(opts, http.PathTemplate(pattern))
+	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &out, nil
+}
+
+func (c *BHTTPClientImpl) Pong(ctx context.Context, in *PongReq, opts ...http.CallOption) (*PongResp, error) {
+	var out PongResp
+	pattern := "/pong"
+	path := binding.EncodeURL(pattern, in, true)
+	opts = append(opts, http.Operation(OperationBPong))
 	opts = append(opts, http.PathTemplate(pattern))
 	err := c.cc.Invoke(ctx, "GET", path, nil, &out, opts...)
 	if err != nil {

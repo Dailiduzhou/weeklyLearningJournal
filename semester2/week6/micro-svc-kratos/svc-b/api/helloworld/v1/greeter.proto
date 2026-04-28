@@ -14,8 +14,24 @@ message PingResp {
   string msg = 1;
 }
 
+message PongReq {}
+message PongResp {
+  string msg = 1;
+}
+
+message Registry {
+  message Etcd {
+    repeated string endpoints = 1;
+  }
+  Etcd etcd = 1;
+}
+
 service B {
   rpc Ping(PingReq) returns (PingResp) {
     option (google.api.http) = {get: "/ping"};
+  }
+
+  rpc Pong(PongReq) returns (PongResp) {
+    option (google.api.http) = {get: "/pong"};
   }
 }

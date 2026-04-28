@@ -102,6 +102,174 @@ func (x *PingResp) GetMsg() string {
 	return ""
 }
 
+type PongReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PongReq) Reset() {
+	*x = PongReq{}
+	mi := &file_helloworld_v1_greeter_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PongReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PongReq) ProtoMessage() {}
+
+func (x *PongReq) ProtoReflect() protoreflect.Message {
+	mi := &file_helloworld_v1_greeter_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PongReq.ProtoReflect.Descriptor instead.
+func (*PongReq) Descriptor() ([]byte, []int) {
+	return file_helloworld_v1_greeter_proto_rawDescGZIP(), []int{2}
+}
+
+type PongResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Msg           string                 `protobuf:"bytes,1,opt,name=msg,proto3" json:"msg,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PongResp) Reset() {
+	*x = PongResp{}
+	mi := &file_helloworld_v1_greeter_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PongResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PongResp) ProtoMessage() {}
+
+func (x *PongResp) ProtoReflect() protoreflect.Message {
+	mi := &file_helloworld_v1_greeter_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PongResp.ProtoReflect.Descriptor instead.
+func (*PongResp) Descriptor() ([]byte, []int) {
+	return file_helloworld_v1_greeter_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *PongResp) GetMsg() string {
+	if x != nil {
+		return x.Msg
+	}
+	return ""
+}
+
+type Registry struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Etcd          *Registry_Etcd         `protobuf:"bytes,1,opt,name=etcd,proto3" json:"etcd,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Registry) Reset() {
+	*x = Registry{}
+	mi := &file_helloworld_v1_greeter_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Registry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Registry) ProtoMessage() {}
+
+func (x *Registry) ProtoReflect() protoreflect.Message {
+	mi := &file_helloworld_v1_greeter_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Registry.ProtoReflect.Descriptor instead.
+func (*Registry) Descriptor() ([]byte, []int) {
+	return file_helloworld_v1_greeter_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *Registry) GetEtcd() *Registry_Etcd {
+	if x != nil {
+		return x.Etcd
+	}
+	return nil
+}
+
+type Registry_Etcd struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Endpoints     []string               `protobuf:"bytes,1,rep,name=endpoints,proto3" json:"endpoints,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Registry_Etcd) Reset() {
+	*x = Registry_Etcd{}
+	mi := &file_helloworld_v1_greeter_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Registry_Etcd) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Registry_Etcd) ProtoMessage() {}
+
+func (x *Registry_Etcd) ProtoReflect() protoreflect.Message {
+	mi := &file_helloworld_v1_greeter_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Registry_Etcd.ProtoReflect.Descriptor instead.
+func (*Registry_Etcd) Descriptor() ([]byte, []int) {
+	return file_helloworld_v1_greeter_proto_rawDescGZIP(), []int{4, 0}
+}
+
+func (x *Registry_Etcd) GetEndpoints() []string {
+	if x != nil {
+		return x.Endpoints
+	}
+	return nil
+}
+
 var File_helloworld_v1_greeter_proto protoreflect.FileDescriptor
 
 const file_helloworld_v1_greeter_proto_rawDesc = "" +
@@ -109,9 +277,17 @@ const file_helloworld_v1_greeter_proto_rawDesc = "" +
 	"\x1bhelloworld/v1/greeter.proto\x12\rhelloworld.v1\x1a\x1cgoogle/api/annotations.proto\"\t\n" +
 	"\aPingReq\"\x1c\n" +
 	"\bPingResp\x12\x10\n" +
-	"\x03msg\x18\x01 \x01(\tR\x03msg2K\n" +
+	"\x03msg\x18\x01 \x01(\tR\x03msg\"\t\n" +
+	"\aPongReq\"\x1c\n" +
+	"\bPongResp\x12\x10\n" +
+	"\x03msg\x18\x01 \x01(\tR\x03msg\"b\n" +
+	"\bRegistry\x120\n" +
+	"\x04etcd\x18\x01 \x01(\v2\x1c.helloworld.v1.Registry.EtcdR\x04etcd\x1a$\n" +
+	"\x04Etcd\x12\x1c\n" +
+	"\tendpoints\x18\x01 \x03(\tR\tendpoints2\x93\x01\n" +
 	"\x01B\x12F\n" +
-	"\x04Ping\x12\x16.helloworld.v1.PingReq\x1a\x17.helloworld.v1.PingResp\"\r\x82\xd3\xe4\x93\x02\a\x12\x05/pingBO\n" +
+	"\x04Ping\x12\x16.helloworld.v1.PingReq\x1a\x17.helloworld.v1.PingResp\"\r\x82\xd3\xe4\x93\x02\a\x12\x05/ping\x12F\n" +
+	"\x04Pong\x12\x16.helloworld.v1.PongReq\x1a\x17.helloworld.v1.PongResp\"\r\x82\xd3\xe4\x93\x02\a\x12\x05/pongBO\n" +
 	"\x1cdev.kratos.api.helloworld.v1B\x11HelloworldProtoV1P\x01Z\x1asvc-b/api/helloworld/v1;v1b\x06proto3"
 
 var (
@@ -126,19 +302,26 @@ func file_helloworld_v1_greeter_proto_rawDescGZIP() []byte {
 	return file_helloworld_v1_greeter_proto_rawDescData
 }
 
-var file_helloworld_v1_greeter_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_helloworld_v1_greeter_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_helloworld_v1_greeter_proto_goTypes = []any{
-	(*PingReq)(nil),  // 0: helloworld.v1.PingReq
-	(*PingResp)(nil), // 1: helloworld.v1.PingResp
+	(*PingReq)(nil),       // 0: helloworld.v1.PingReq
+	(*PingResp)(nil),      // 1: helloworld.v1.PingResp
+	(*PongReq)(nil),       // 2: helloworld.v1.PongReq
+	(*PongResp)(nil),      // 3: helloworld.v1.PongResp
+	(*Registry)(nil),      // 4: helloworld.v1.Registry
+	(*Registry_Etcd)(nil), // 5: helloworld.v1.Registry.Etcd
 }
 var file_helloworld_v1_greeter_proto_depIdxs = []int32{
-	0, // 0: helloworld.v1.B.Ping:input_type -> helloworld.v1.PingReq
-	1, // 1: helloworld.v1.B.Ping:output_type -> helloworld.v1.PingResp
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	5, // 0: helloworld.v1.Registry.etcd:type_name -> helloworld.v1.Registry.Etcd
+	0, // 1: helloworld.v1.B.Ping:input_type -> helloworld.v1.PingReq
+	2, // 2: helloworld.v1.B.Pong:input_type -> helloworld.v1.PongReq
+	1, // 3: helloworld.v1.B.Ping:output_type -> helloworld.v1.PingResp
+	3, // 4: helloworld.v1.B.Pong:output_type -> helloworld.v1.PongResp
+	3, // [3:5] is the sub-list for method output_type
+	1, // [1:3] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_helloworld_v1_greeter_proto_init() }
@@ -152,7 +335,7 @@ func file_helloworld_v1_greeter_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_helloworld_v1_greeter_proto_rawDesc), len(file_helloworld_v1_greeter_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

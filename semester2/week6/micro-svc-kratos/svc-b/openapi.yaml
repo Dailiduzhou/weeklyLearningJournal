@@ -18,9 +18,26 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/helloworld.v1.PingResp'
+    /pong:
+        get:
+            tags:
+                - B
+            operationId: B_Pong
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/helloworld.v1.PongResp'
 components:
     schemas:
         helloworld.v1.PingResp:
+            type: object
+            properties:
+                msg:
+                    type: string
+        helloworld.v1.PongResp:
             type: object
             properties:
                 msg:
