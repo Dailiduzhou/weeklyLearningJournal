@@ -1,7 +1,8 @@
 FROM golang:1.19 AS builder
 
-COPY . /src
-WORKDIR /src
+COPY svc-a /src/svc-a
+COPY svc-b /src/svc-b
+WORKDIR /src/svc-a
 
 RUN GOPROXY=https://goproxy.cn make build
 

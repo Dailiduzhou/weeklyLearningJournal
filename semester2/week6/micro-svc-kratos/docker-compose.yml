@@ -1,0 +1,30 @@
+services:
+  etcd:
+    image: bitnami/etcd:3.5
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+    ports:
+      - "2379:2379"
+
+  svc-b:
+    build: ./svc-b
+    depends_on:
+      - etcd
+    ports:
+      - "8000:8000"
+      - "9000:9000"
+    volumes:
+      - ./svc-b/configs/config.docker.yaml:/data/conf/config.yaml
+
+  svc-a:
+    build:
+      context: .
+      dockerfile: svc-a/Dockerfile
+    depends_on:
+      - etcd
+      - svc-b
+    ports:
+      - "8001:8001"
+      - "9001:9001"
+    volumes:
+      - ./svc-a/configs/config.docker.yaml:/data/conf/config.yaml
