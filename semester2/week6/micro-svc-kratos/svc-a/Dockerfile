@@ -1,9 +1,12 @@
-FROM golang:1.19 AS builder
+FROM golang:1.25 AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends git
 
 COPY svc-a /src/svc-a
 COPY svc-b /src/svc-b
 WORKDIR /src/svc-a
 
+RUN GOPROXY=https://goproxy.cn go mod download
 RUN GOPROXY=https://goproxy.cn make build
 
 FROM debian:stable-slim
