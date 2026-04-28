@@ -2,28 +2,25 @@ package service
 
 import (
 	"context"
+	"fmt"
 
 	v1 "svc-a/api/helloworld/v1"
-	"svc-a/internal/biz"
+	bv1 "svc-b/api/helloworld/v1"
 )
 
-// GreeterService is a greeter service.
 type GreeterService struct {
-	v1.UnimplementedGreeterServer
-
-	uc *biz.GreeterUsecase
+	v1.UnimplementedAServer
+	bClient bv1.BClient
 }
 
-// NewGreeterService new a greeter service.
-func NewGreeterService(uc *biz.GreeterUsecase) *GreeterService {
-	return &GreeterService{uc: uc}
+func NewGreeterService(bClient bv1.BClient) *GreeterService {
+	return &GreeterService{bClient: bClient}
 }
 
-// SayHello implements helloworld.GreeterServer.
-func (s *GreeterService) SayHello(ctx context.Context, in *v1.HelloRequest) (*v1.HelloReply, error) {
-	g, err := s.uc.CreateGreeter(ctx, &biz.Greeter{Hello: in.Name})
+func (s *GreeterService) Ping(ctx context.Context, _ *v1.PingReq) (*v1.PingResp, error) {
+	resp, err := s.bClient.Pong(ctx, &bv1.PongReq{})
 	if err != nil {
 		return nil, err
 	}
-	return &v1.HelloReply{Message: "Hello " + g.Hello}, nil
+	return &v1.PingResp{Msg: fmt.Sprintf("ping from svc-a | %s", resp.Msg)}, nil
 }

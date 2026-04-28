@@ -9,9 +9,7 @@ package main
 import (
 	"github.com/go-kratos/kratos/v2"
 	"github.com/go-kratos/kratos/v2/log"
-	"svc-b/internal/biz"
 	"svc-b/internal/conf"
-	"svc-b/internal/data"
 	"svc-b/internal/server"
 	"svc-b/internal/service"
 )
@@ -24,19 +22,11 @@ import (
 
 // wireApp init kratos application.
 func wireApp(confServer *conf.Server, confData *conf.Data, registry *conf.Registry, logger log.Logger) (*kratos.App, func(), error) {
-	dataData, cleanup, err := data.NewData(confData)
-	if err != nil {
-		return nil, nil, err
-	}
-	greeterRepo := data.NewGreeterRepo(dataData, logger)
-	greeterUsecase := biz.NewGreeterUsecase(greeterRepo)
-	greeterService := service.NewGreeterService(greeterUsecase)
+	greeterService := service.NewGreeterService()
 	grpcServer := server.NewGRPCServer(confServer, greeterService, logger)
 	httpServer := server.NewHTTPServer(confServer, greeterService, logger)
 	client := server.NewEtcdClient(registry)
 	registrar := server.NewRegistrar(client)
 	app := newApp(logger, grpcServer, httpServer, registrar)
-	return app, func() {
-		cleanup()
-	}, nil
+	return app, func() {}, nil
 }

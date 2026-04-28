@@ -11,7 +11,10 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20251202230838-ff82c1b0f217
 	google.golang.org/grpc v1.79.3
 	google.golang.org/protobuf v1.36.10
+	svc-b v0.0.0
 )
+
+replace svc-b => ../svc-b
 
 require (
 	dario.cat/mergo v1.0.0 // indirect
