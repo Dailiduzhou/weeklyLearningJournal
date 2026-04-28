@@ -18,22 +18,25 @@ RUN go mod download
 
 COPY gateway .
 
-RUN go mod tidy
-
-RUN go build -ldflags="-s -w" -o /app/server gateway.go
+RUN go mod tidy && \
+    go build -ldflags="-s -w" -o /app/server gateway.go
 
 # 运行阶段
 FROM alpine:3.19
 
 RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories && \
-  apk add --no-cache ca-certificates tzdata curl
+    apk add --no-cache ca-certificates tzdata curl
 
 ENV TZ=Asia/Shanghai
 
 WORKDIR /app
 
 COPY --from=builder /app/server /app/server
+COPY --from=builder /build/gateway/etc/gateway-docker.yaml /app/etc/gateway.yaml
 
 EXPOSE 8888
+
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8888/health || exit 1
 
 CMD ["/app/server", "-f", "/app/etc/gateway.yaml"]

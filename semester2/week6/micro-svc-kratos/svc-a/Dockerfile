@@ -7,7 +7,7 @@ COPY svc-b /src/svc-b
 WORKDIR /src/svc-a
 
 RUN GOPROXY=https://goproxy.cn go mod download
-RUN GOPROXY=https://goproxy.cn make build
+RUN make build
 
 FROM debian:stable-slim
 
@@ -17,7 +17,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         && rm -rf /var/lib/apt/lists/ \
         && apt-get autoremove -y && apt-get autoclean -y
 
-COPY --from=builder /src/bin /app
+COPY --from=builder /src/svc-a/bin /app
 
 WORKDIR /app
 
@@ -25,4 +25,4 @@ EXPOSE 8000
 EXPOSE 9000
 VOLUME /data/conf
 
-CMD ["./server", "-conf", "/data/conf"]
+CMD ["./svc-a", "-conf", "/data/conf"]
