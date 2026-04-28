@@ -101,6 +101,86 @@ func (x *PingResp) GetMsg() string {
 	return ""
 }
 
+type PongReq struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PongReq) Reset() {
+	*x = PongReq{}
+	mi := &file_b_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PongReq) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PongReq) ProtoMessage() {}
+
+func (x *PongReq) ProtoReflect() protoreflect.Message {
+	mi := &file_b_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PongReq.ProtoReflect.Descriptor instead.
+func (*PongReq) Descriptor() ([]byte, []int) {
+	return file_b_proto_rawDescGZIP(), []int{2}
+}
+
+type PongResp struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Msg           string                 `protobuf:"bytes,1,opt,name=msg,proto3" json:"msg,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PongResp) Reset() {
+	*x = PongResp{}
+	mi := &file_b_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PongResp) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PongResp) ProtoMessage() {}
+
+func (x *PongResp) ProtoReflect() protoreflect.Message {
+	mi := &file_b_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PongResp.ProtoReflect.Descriptor instead.
+func (*PongResp) Descriptor() ([]byte, []int) {
+	return file_b_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *PongResp) GetMsg() string {
+	if x != nil {
+		return x.Msg
+	}
+	return ""
+}
+
 var File_b_proto protoreflect.FileDescriptor
 
 const file_b_proto_rawDesc = "" +
@@ -108,9 +188,13 @@ const file_b_proto_rawDesc = "" +
 	"\ab.proto\x12\x02pb\"\t\n" +
 	"\aPingReq\"\x1c\n" +
 	"\bPingResp\x12\x10\n" +
-	"\x03msg\x18\x01 \x01(\tR\x03msg2&\n" +
+	"\x03msg\x18\x01 \x01(\tR\x03msg\"\t\n" +
+	"\aPongReq\"\x1c\n" +
+	"\bPongResp\x12\x10\n" +
+	"\x03msg\x18\x01 \x01(\tR\x03msg2I\n" +
 	"\x01B\x12!\n" +
-	"\x04Ping\x12\v.pb.PingReq\x1a\f.pb.PingRespB\x06Z\x04./pbb\x06proto3"
+	"\x04Ping\x12\v.pb.PingReq\x1a\f.pb.PingResp\x12!\n" +
+	"\x04Pong\x12\v.pb.PongReq\x1a\f.pb.PongRespB\x06Z\x04./pbb\x06proto3"
 
 var (
 	file_b_proto_rawDescOnce sync.Once
@@ -124,16 +208,20 @@ func file_b_proto_rawDescGZIP() []byte {
 	return file_b_proto_rawDescData
 }
 
-var file_b_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_b_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_b_proto_goTypes = []any{
 	(*PingReq)(nil),  // 0: pb.PingReq
 	(*PingResp)(nil), // 1: pb.PingResp
+	(*PongReq)(nil),  // 2: pb.PongReq
+	(*PongResp)(nil), // 3: pb.PongResp
 }
 var file_b_proto_depIdxs = []int32{
 	0, // 0: pb.B.Ping:input_type -> pb.PingReq
-	1, // 1: pb.B.Ping:output_type -> pb.PingResp
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
+	2, // 1: pb.B.Pong:input_type -> pb.PongReq
+	1, // 2: pb.B.Ping:output_type -> pb.PingResp
+	3, // 3: pb.B.Pong:output_type -> pb.PongResp
+	2, // [2:4] is the sub-list for method output_type
+	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name
 	0, // [0:0] is the sub-list for extension extendee
 	0, // [0:0] is the sub-list for field type_name
@@ -150,7 +238,7 @@ func file_b_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_b_proto_rawDesc), len(file_b_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -6,7 +6,6 @@ package server
 
 import (
 	"context"
-
 	"svc-b/internal/logic"
 	"svc-b/internal/svc"
 	"svc-b/pb"
@@ -26,4 +25,9 @@ func NewBServer(svcCtx *svc.ServiceContext) *BServer {
 func (s *BServer) Ping(ctx context.Context, in *pb.PingReq) (*pb.PingResp, error) {
 	l := logic.NewPingLogic(ctx, s.svcCtx)
 	return l.Ping(in)
+}
+
+func (s *BServer) Pong(ctx context.Context, in *pb.PongReq) (*pb.PongResp, error) {
+	l := logic.NewPongLogic(ctx, s.svcCtx)
+	return l.Pong(in)
 }

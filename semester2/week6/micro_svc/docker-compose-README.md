@@ -55,11 +55,15 @@ make test
 
 ```bash
 curl http://localhost:8888/api/a/call
+curl http://localhost:8888/api/b/pong
 ```
 
 预期输出：
 ```json
 {"msg":"Service A executed. -> Hello from svc B"}
+```
+```json
+{"msg":"Independnt Response from service B"}
 ```
 
 ### 3. 查看日志

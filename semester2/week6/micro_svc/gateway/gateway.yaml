@@ -12,3 +12,13 @@ Upstreams:
       - Method: GET
         Path: /api/a/call
         RpcPath: pb.A/CallA
+  - Name: b-service
+    Grpc:
+      Etcd:
+        Hosts:
+          - 127.0.0.1:2379
+        Key: b.rpc
+    Mappings:
+      - Method: GET
+        Path: /api/b/pong
+        RpcPath: pb.B/Pong

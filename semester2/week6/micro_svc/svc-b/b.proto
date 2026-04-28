@@ -6,7 +6,12 @@ message PingReq {}
 message PingResp {
   string msg = 1;
 }
+message PongReq {}
+message PongResp {
+  string msg = 1;
+}
 
 service B {
   rpc Ping(PingReq) returns(PingResp);
+  rpc Pong(PongReq) returns(PongResp);
 }

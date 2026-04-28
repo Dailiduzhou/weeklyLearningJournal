@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	B_Ping_FullMethodName = "/pb.B/Ping"
+	B_Pong_FullMethodName = "/pb.B/Pong"
 )
 
 // BClient is the client API for B service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type BClient interface {
 	Ping(ctx context.Context, in *PingReq, opts ...grpc.CallOption) (*PingResp, error)
+	Pong(ctx context.Context, in *PongReq, opts ...grpc.CallOption) (*PongResp, error)
 }
 
 type bClient struct {
@@ -47,11 +49,22 @@ func (c *bClient) Ping(ctx context.Context, in *PingReq, opts ...grpc.CallOption
 	return out, nil
 }
 
+func (c *bClient) Pong(ctx context.Context, in *PongReq, opts ...grpc.CallOption) (*PongResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PongResp)
+	err := c.cc.Invoke(ctx, B_Pong_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // BServer is the server API for B service.
 // All implementations must embed UnimplementedBServer
 // for forward compatibility.
 type BServer interface {
 	Ping(context.Context, *PingReq) (*PingResp, error)
+	Pong(context.Context, *PongReq) (*PongResp, error)
 	mustEmbedUnimplementedBServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedBServer struct{}
 
 func (UnimplementedBServer) Ping(context.Context, *PingReq) (*PingResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method Ping not implemented")
+}
+func (UnimplementedBServer) Pong(context.Context, *PongReq) (*PongResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method Pong not implemented")
 }
 func (UnimplementedBServer) mustEmbedUnimplementedBServer() {}
 func (UnimplementedBServer) testEmbeddedByValue()           {}
@@ -104,6 +120,24 @@ func _B_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{})
 	return interceptor(ctx, in, info, handler)
 }
 
+func _B_Pong_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PongReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(BServer).Pong(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: B_Pong_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(BServer).Pong(ctx, req.(*PongReq))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // B_ServiceDesc is the grpc.ServiceDesc for B service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var B_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Ping",
 			Handler:    _B_Ping_Handler,
+		},
+		{
+			MethodName: "Pong",
+			Handler:    _B_Pong_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

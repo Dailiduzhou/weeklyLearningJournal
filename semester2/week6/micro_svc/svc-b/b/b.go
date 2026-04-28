@@ -16,9 +16,12 @@ import (
 type (
 	PingReq  = pb.PingReq
 	PingResp = pb.PingResp
+	PongReq  = pb.PongReq
+	PongResp = pb.PongResp
 
 	B interface {
 		Ping(ctx context.Context, in *PingReq, opts ...grpc.CallOption) (*PingResp, error)
+		Pong(ctx context.Context, in *PongReq, opts ...grpc.CallOption) (*PongResp, error)
 	}
 
 	defaultB struct {
@@ -35,4 +38,9 @@ func NewB(cli zrpc.Client) B {
 func (m *defaultB) Ping(ctx context.Context, in *PingReq, opts ...grpc.CallOption) (*PingResp, error) {
 	client := pb.NewBClient(m.cli.Conn())
 	return client.Ping(ctx, in, opts...)
+}
+
+func (m *defaultB) Pong(ctx context.Context, in *PongReq, opts ...grpc.CallOption) (*PongResp, error) {
+	client := pb.NewBClient(m.cli.Conn())
+	return client.Pong(ctx, in, opts...)
 }
