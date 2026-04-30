@@ -40,7 +40,7 @@ services:
       - "8080"
     volumes:
       # 挂载开发环境配置
-      - ./svc-b/etc/pb.yaml:/app/etc/pb.yaml:ro
+      - ./svc-b/etc/pb-docker.yaml:/app/etc/pb.yaml:ro
     networks:
       - micro-network
     command: ["/app/server", "-f", "/app/etc/pb.yaml"]

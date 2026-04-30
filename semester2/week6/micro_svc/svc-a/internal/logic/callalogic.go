@@ -2,9 +2,9 @@ package logic
 
 import (
 	"context"
-
 	"svc-a/internal/svc"
 	"svc-a/pb"
+
 	bpb "svc-b/pb"
 
 	"github.com/zeromicro/go-zero/core/logx"
@@ -31,10 +31,10 @@ func (l *CallALogic) CallA(in *pb.CallAReq) (*pb.CallAResp, error) {
 	// 2. 通过 zrpc 客户端跨服务调用 B (自动负载均衡和故障转移)
 	bResp, err := l.svcCtx.BRpc.Ping(l.ctx, &bpb.PingReq{})
 	if err == nil {
-		msg += " -> " + bResp.Msg
+		msg += " and then, " + bResp.Msg
 	} else {
 		l.Logger.Errorf("Failed to call service B: %v", err)
-		msg += " -> [B unavailable]"
+		msg += " and then, [B unavailable]"
 	}
 
 	return &pb.CallAResp{
