@@ -5,3 +5,10 @@ edition = "2024"
 
 [dependencies]
 rayon = "1.12"
+
+[dev-dependencies]
+criterion = { version = "0.8.2", features = ["html_reports"] }
+
+[[bench]]
+name = "parallel_bench"
+harness = false
