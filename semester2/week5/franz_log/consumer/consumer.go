@@ -18,6 +18,13 @@ type UserEvent struct {
 	Timestamp int64  `json:"timestamp"`
 }
 
+type DLQMessage struct {
+	OriginalMessage []byte `json:"original_message"`
+	Error           string `json:"error"`
+	Timestamp       int64  `json:"timestamp"`
+	Topic           string `json:"topic"`
+}
+
 type WindowStat struct {
 	UVMap       map[int]struct{}
 	ActionCount map[string]int
@@ -32,6 +39,16 @@ func main() {
 	if brokers[0] == "" {
 		brokers = []string{"localhost:9092"}
 	}
+
+	// 创建死信队列生产者
+	dlqClient, err := kgo.NewClient(
+		kgo.SeedBrokers(brokers...),
+		kgo.AllowAutoTopicCreation(),
+	)
+	if err != nil {
+		log.Fatalf("创建死信队列生产者失败: %v", err)
+	}
+	defer dlqClient.Close()
 
 	// 创建 kgo 客户端，配置消费者组
 	client, err := kgo.NewClient(
@@ -74,6 +91,8 @@ func main() {
 						var evt UserEvent
 						if err := json.Unmarshal(record.Value, &evt); err != nil {
 							log.Printf("Unmarshaling failure: %v", err)
+							// 发送到死信队列
+							sendToDLQ(dlqClient, record, err)
 							continue
 						}
 
@@ -155,4 +174,32 @@ func startMetricsEngine(eventChan <-chan UserEvent) {
 			}
 		}
 	}
+}
+
+// sendToDLQ 发送失败消息到死信队列
+func sendToDLQ(dlqClient *kgo.Client, record *kgo.Record, processingErr error) {
+	dlqMsg := DLQMessage{
+		OriginalMessage: record.Value,
+		Error:           processingErr.Error(),
+		Timestamp:       time.Now().Unix(),
+		Topic:           record.Topic,
+	}
+
+	dlqMsgBytes, err := json.Marshal(dlqMsg)
+	if err != nil {
+		log.Printf("序列化死信消息失败: %v", err)
+		return
+	}
+
+	// 发送到死信队列 topic
+	dlqClient.Produce(context.Background(), &kgo.Record{
+		Topic: "user_behavior_dlq",
+		Value: dlqMsgBytes,
+	}, func(r *kgo.Record, err error) {
+		if err != nil {
+			log.Printf("发送到死信队列失败: %v", err)
+		} else {
+			log.Printf("消息已发送到死信队列: %s", string(record.Value))
+		}
+	})
 }

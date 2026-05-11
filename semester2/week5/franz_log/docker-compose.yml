@@ -41,3 +41,12 @@ services:
         condition: service_healthy
     environment:
       - KAFKA_BROKERS=redpanda:9092
+
+  dlq-consumer:
+    build: ./dlq_consumer
+    container_name: franz-dlq-consumer
+    depends_on:
+      redpanda:
+        condition: service_healthy
+    environment:
+      - KAFKA_BROKERS=redpanda:9092
