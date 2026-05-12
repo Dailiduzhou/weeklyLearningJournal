@@ -1,7 +1,7 @@
 package server
 
 import (
-	v1 "svc-a/api/helloworld/v1"
+	v1 "svc-a/api/helloworld/a/v1"
 	"svc-a/internal/conf"
 	"svc-a/internal/service"
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	v1 "svc-a/api/helloworld/v1"
+	v1 "svc-a/api/helloworld/a/v1"
 	bv1 "svc-b/api/helloworld/v1"
 )
 

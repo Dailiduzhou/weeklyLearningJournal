@@ -21,8 +21,8 @@ COPY --from=builder /src/svc-a/bin /app
 
 WORKDIR /app
 
-EXPOSE 8000
-EXPOSE 9000
+EXPOSE 8001
+EXPOSE 9001
 VOLUME /data/conf
 
 CMD ["./svc-a", "-conf", "/data/conf"]

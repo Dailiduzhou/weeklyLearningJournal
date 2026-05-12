@@ -1,6 +1,8 @@
 package server
 
 import (
+	"context"
+
 	"github.com/go-kratos/kratos/v2/registry"
 	transgrpc "github.com/go-kratos/kratos/v2/transport/grpc"
 	bv1 "svc-b/api/helloworld/v1"
@@ -8,7 +10,7 @@ import (
 
 func NewBClient(dis registry.Discovery) bv1.BClient {
 	conn, err := transgrpc.DialInsecure(
-		nil,
+		context.Background(),
 		transgrpc.WithEndpoint("discovery:///svc-b"),
 		transgrpc.WithDiscovery(dis),
 	)

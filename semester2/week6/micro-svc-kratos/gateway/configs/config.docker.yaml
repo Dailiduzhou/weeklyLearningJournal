@@ -1,0 +1,30 @@
+name: gateway
+version: v1.0.0
+endpoints:
+  - path: /api/a/*
+    method: GET
+    description: "svc-a endpoints"
+    protocol: HTTP
+    timeout: 1s
+    backends:
+      - target: discovery:///svc-a
+        weight: 100
+    middlewares:
+      - name: rewrite
+        options:
+          '@type': type.googleapis.com/gateway.middleware.rewrite.v1.Rewrite
+          stripPrefix: /api/a
+
+  - path: /api/b/*
+    method: GET
+    description: "svc-b endpoints"
+    protocol: HTTP
+    timeout: 1s
+    backends:
+      - target: discovery:///svc-b
+        weight: 100
+    middlewares:
+      - name: rewrite
+        options:
+          '@type': type.googleapis.com/gateway.middleware.rewrite.v1.Rewrite
+          stripPrefix: /api/b

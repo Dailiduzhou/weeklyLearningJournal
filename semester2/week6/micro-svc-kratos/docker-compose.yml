@@ -32,3 +32,14 @@ services:
       - "9001:9001"
     volumes:
       - ./svc-a/configs/config.docker.yaml:/data/conf/config.yaml
+
+  gateway:
+    build: ./gateway
+    depends_on:
+      - etcd
+      - svc-a
+      - svc-b
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./gateway/configs/config.docker.yaml:/data/conf/config.yaml

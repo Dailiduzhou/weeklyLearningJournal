@@ -17,10 +17,10 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/helloworld.v1.PingResp'
+                                $ref: '#/components/schemas/helloworld.a.v1.PingResp'
 components:
     schemas:
-        helloworld.v1.PingResp:
+        helloworld.a.v1.PingResp:
             type: object
             properties:
                 msg:
