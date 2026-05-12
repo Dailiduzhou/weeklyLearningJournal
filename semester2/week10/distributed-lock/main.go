@@ -74,36 +74,48 @@ func buyProduct(client *redis.Client, userID int, wg *sync.WaitGroup) {
 	defer wg.Done()
 
 	lockKey := "lock:product:1001"
-	lock := NewRedisLock(client, lockKey, 5*time.Second)
+	maxRetries := 30
+	retryInterval := 10 * time.Millisecond
 
-	acquired, err := lock.TryLock(ctx)
-	if err != nil {
-		log.Printf("User %d Sys failed, err: %v\n", userID, err)
-		return
-	}
+	for i := 0; i < maxRetries; i++ {
+		lock := NewRedisLock(client, lockKey, 5*time.Second)
 
-	if !acquired {
-		fmt.Printf("User %d failed to acquire lock\n", userID)
-		return
-	}
+		acquired, err := lock.TryLock(ctx)
+		if err != nil {
+			log.Printf("User %d Sys failed, err: %v\n", userID, err)
+			return
+		}
 
-	stopRefresh := make(chan struct{})
-	go func() {
-		ticker := time.NewTicker(lock.expire / 3)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-stopRefresh:
-				return
-			case <-ticker.C:
-				if err := lock.Refresh(ctx); err != nil {
-					log.Printf("User %d refresh lock error: %v\n", userID, err)
+		if !acquired {
+			time.Sleep(retryInterval)
+			continue
+		}
+
+		stopRefresh := make(chan struct{})
+		go func() {
+			ticker := time.NewTicker(lock.expire / 3)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-stopRefresh:
+					return
+				case <-ticker.C:
+					if err := lock.Refresh(ctx); err != nil {
+						log.Printf("User %d refresh lock error: %v\n", userID, err)
+					}
 				}
 			}
-		}
-	}()
+		}()
 
-	defer func() {
+		time.Sleep(20 * time.Millisecond)
+
+		if productInventory > 0 {
+			productInventory--
+			fmt.Printf("User %d buy successfully\n", userID)
+		} else {
+			fmt.Printf("User %d, product sold out\n", userID)
+		}
+
 		close(stopRefresh)
 		ok, err := lock.Unlock(ctx)
 		if err != nil {
@@ -111,16 +123,10 @@ func buyProduct(client *redis.Client, userID int, wg *sync.WaitGroup) {
 		} else if !ok {
 			log.Printf("User %d unlock failed, lock may have expired\n", userID)
 		}
-	}()
-
-	time.Sleep(20 * time.Millisecond)
-
-	if productInventory > 0 {
-		productInventory--
-		fmt.Printf("User %d buy successfully\n", userID)
-	} else {
-		fmt.Printf("User %d, product sold out\n", userID)
+		return
 	}
+
+	fmt.Printf("User %d failed to acquire lock after %d retries\n", userID, maxRetries)
 }
 
 func main() {
