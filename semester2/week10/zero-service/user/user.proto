@@ -1,0 +1,22 @@
+
+syntax = "proto3";
+
+package user;
+option go_package="./user";
+
+message QueryReq {
+  int64 id = 1;
+}
+
+message QueryResp {
+  int64 id = 1;
+  message Post {
+    int64 id = 1;
+    string name = 2;
+  };
+  repeated Post posts = 2;
+}
+
+service User {
+  rpc Query(QueryReq) returns (QueryResp);
+}
