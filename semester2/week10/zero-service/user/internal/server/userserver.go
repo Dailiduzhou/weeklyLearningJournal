@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week10/zero-service/user/internal/logic"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week10/zero-service/user/internal/svc"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week10/zero-service/user/user/user"
+	"zero-service/user/internal/logic"
+	"zero-service/user/internal/svc"
+	"zero-service/user/user"
 )
 
 type UserServer struct {
@@ -23,7 +23,7 @@ func NewUserServer(svcCtx *svc.ServiceContext) *UserServer {
 	}
 }
 
-func (s *UserServer) Query(ctx context.Context, in *user.QueryReq) (*user.QueryResp, error) {
-	l := logic.NewQueryLogic(ctx, s.svcCtx)
-	return l.Query(in)
+func (s *UserServer) Ping(ctx context.Context, in *user.Request) (*user.Response, error) {
+	l := logic.NewPingLogic(ctx, s.svcCtx)
+	return l.Ping(in)
 }

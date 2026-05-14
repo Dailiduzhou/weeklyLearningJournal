@@ -1,8 +1,9 @@
 package svc
 
 import (
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week10/zero-service/post/internal/config"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week10/zero-service/post/internal/model"
+	"zero-service/post/internal/config"
+	"zero-service/post/internal/model"
+
 	"github.com/zeromicro/go-zero/core/stores/redis"
 	"github.com/zeromicro/go-zero/core/stores/sqlx"
 )

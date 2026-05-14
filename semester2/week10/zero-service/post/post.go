@@ -4,10 +4,10 @@ import (
 	"flag"
 	"fmt"
 
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week10/zero-service/post/internal/config"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week10/zero-service/post/internal/server"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week10/zero-service/post/internal/svc"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week10/zero-service/post/post/post"
+	"zero-service/post/internal/config"
+	"zero-service/post/internal/server"
+	"zero-service/post/internal/svc"
+	"zero-service/post/post"
 
 	"github.com/zeromicro/go-zero/core/conf"
 	"github.com/zeromicro/go-zero/core/service"

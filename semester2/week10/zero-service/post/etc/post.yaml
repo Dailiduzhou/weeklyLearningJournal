@@ -1,8 +1,8 @@
 Name: post.rpc
-ListenOn: 0.0.0.0:8080
+ListenOn: 0.0.0.0:9001
 Etcd:
   Hosts:
-  - 127.0.0.1:2379
+  - etcd:2379
   Key: post.rpc
 
 Redis:
@@ -15,4 +15,3 @@ DB:
 Cache:
   - Host: redis:6379
     Pass: ""
-

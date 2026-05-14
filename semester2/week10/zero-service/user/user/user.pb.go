@@ -2,9 +2,9 @@
 // versions:
 // 	protoc-gen-go v1.36.11
 // 	protoc        v7.34.1
-// source: post.proto
+// source: user.proto
 
-package post
+package user
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -30,7 +30,7 @@ type GetpostReq struct {
 
 func (x *GetpostReq) Reset() {
 	*x = GetpostReq{}
-	mi := &file_post_proto_msgTypes[0]
+	mi := &file_user_proto_msgTypes[0]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -42,7 +42,7 @@ func (x *GetpostReq) String() string {
 func (*GetpostReq) ProtoMessage() {}
 
 func (x *GetpostReq) ProtoReflect() protoreflect.Message {
-	mi := &file_post_proto_msgTypes[0]
+	mi := &file_user_proto_msgTypes[0]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -55,7 +55,7 @@ func (x *GetpostReq) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetpostReq.ProtoReflect.Descriptor instead.
 func (*GetpostReq) Descriptor() ([]byte, []int) {
-	return file_post_proto_rawDescGZIP(), []int{0}
+	return file_user_proto_rawDescGZIP(), []int{0}
 }
 
 func (x *GetpostReq) GetUserid() int64 {
@@ -74,7 +74,7 @@ type GetpostResp struct {
 
 func (x *GetpostResp) Reset() {
 	*x = GetpostResp{}
-	mi := &file_post_proto_msgTypes[1]
+	mi := &file_user_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -86,7 +86,7 @@ func (x *GetpostResp) String() string {
 func (*GetpostResp) ProtoMessage() {}
 
 func (x *GetpostResp) ProtoReflect() protoreflect.Message {
-	mi := &file_post_proto_msgTypes[1]
+	mi := &file_user_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -99,7 +99,7 @@ func (x *GetpostResp) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetpostResp.ProtoReflect.Descriptor instead.
 func (*GetpostResp) Descriptor() ([]byte, []int) {
-	return file_post_proto_rawDescGZIP(), []int{1}
+	return file_user_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *GetpostResp) GetPosts() []*GetpostResp_Post {
@@ -119,7 +119,7 @@ type GetpostResp_Post struct {
 
 func (x *GetpostResp_Post) Reset() {
 	*x = GetpostResp_Post{}
-	mi := &file_post_proto_msgTypes[2]
+	mi := &file_user_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -131,7 +131,7 @@ func (x *GetpostResp_Post) String() string {
 func (*GetpostResp_Post) ProtoMessage() {}
 
 func (x *GetpostResp_Post) ProtoReflect() protoreflect.Message {
-	mi := &file_post_proto_msgTypes[2]
+	mi := &file_user_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -144,7 +144,7 @@ func (x *GetpostResp_Post) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetpostResp_Post.ProtoReflect.Descriptor instead.
 func (*GetpostResp_Post) Descriptor() ([]byte, []int) {
-	return file_post_proto_rawDescGZIP(), []int{1, 0}
+	return file_user_proto_rawDescGZIP(), []int{1, 0}
 }
 
 func (x *GetpostResp_Post) GetId() int64 {
@@ -161,45 +161,45 @@ func (x *GetpostResp_Post) GetName() string {
 	return ""
 }
 
-var File_post_proto protoreflect.FileDescriptor
+var File_user_proto protoreflect.FileDescriptor
 
-const file_post_proto_rawDesc = "" +
+const file_user_proto_rawDesc = "" +
 	"\n" +
 	"\n" +
-	"post.proto\x12\x04post\"$\n" +
+	"user.proto\x12\x04user\"$\n" +
 	"\n" +
 	"GetpostReq\x12\x16\n" +
 	"\x06userid\x18\x01 \x01(\x03R\x06userid\"g\n" +
 	"\vGetpostResp\x12,\n" +
-	"\x05posts\x18\x01 \x03(\v2\x16.post.GetpostResp.PostR\x05posts\x1a*\n" +
+	"\x05posts\x18\x01 \x03(\v2\x16.user.GetpostResp.PostR\x05posts\x1a*\n" +
 	"\x04Post\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x03R\x02id\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name26\n" +
 	"\x04Post\x12.\n" +
-	"\aGetpost\x12\x10.post.GetpostReq\x1a\x11.post.GetpostRespB\bZ\x06./postb\x06proto3"
+	"\aGetpost\x12\x10.user.GetpostReq\x1a\x11.user.GetpostRespB\bZ\x06./userb\x06proto3"
 
 var (
-	file_post_proto_rawDescOnce sync.Once
-	file_post_proto_rawDescData []byte
+	file_user_proto_rawDescOnce sync.Once
+	file_user_proto_rawDescData []byte
 )
 
-func file_post_proto_rawDescGZIP() []byte {
-	file_post_proto_rawDescOnce.Do(func() {
-		file_post_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_post_proto_rawDesc), len(file_post_proto_rawDesc)))
+func file_user_proto_rawDescGZIP() []byte {
+	file_user_proto_rawDescOnce.Do(func() {
+		file_user_proto_rawDescData = protoimpl.X.CompressGZIP(unsafe.Slice(unsafe.StringData(file_user_proto_rawDesc), len(file_user_proto_rawDesc)))
 	})
-	return file_post_proto_rawDescData
+	return file_user_proto_rawDescData
 }
 
-var file_post_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
-var file_post_proto_goTypes = []any{
-	(*GetpostReq)(nil),       // 0: post.GetpostReq
-	(*GetpostResp)(nil),      // 1: post.GetpostResp
-	(*GetpostResp_Post)(nil), // 2: post.GetpostResp.Post
+var file_user_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_user_proto_goTypes = []any{
+	(*GetpostReq)(nil),       // 0: user.GetpostReq
+	(*GetpostResp)(nil),      // 1: user.GetpostResp
+	(*GetpostResp_Post)(nil), // 2: user.GetpostResp.Post
 }
-var file_post_proto_depIdxs = []int32{
-	2, // 0: post.GetpostResp.posts:type_name -> post.GetpostResp.Post
-	0, // 1: post.Post.Getpost:input_type -> post.GetpostReq
-	1, // 2: post.Post.Getpost:output_type -> post.GetpostResp
+var file_user_proto_depIdxs = []int32{
+	2, // 0: user.GetpostResp.posts:type_name -> user.GetpostResp.Post
+	0, // 1: user.Post.Getpost:input_type -> user.GetpostReq
+	1, // 2: user.Post.Getpost:output_type -> user.GetpostResp
 	2, // [2:3] is the sub-list for method output_type
 	1, // [1:2] is the sub-list for method input_type
 	1, // [1:1] is the sub-list for extension type_name
@@ -207,26 +207,26 @@ var file_post_proto_depIdxs = []int32{
 	0, // [0:1] is the sub-list for field type_name
 }
 
-func init() { file_post_proto_init() }
-func file_post_proto_init() {
-	if File_post_proto != nil {
+func init() { file_user_proto_init() }
+func file_user_proto_init() {
+	if File_user_proto != nil {
 		return
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
-			RawDescriptor: unsafe.Slice(unsafe.StringData(file_post_proto_rawDesc), len(file_post_proto_rawDesc)),
+			RawDescriptor: unsafe.Slice(unsafe.StringData(file_user_proto_rawDesc), len(file_user_proto_rawDesc)),
 			NumEnums:      0,
 			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
-		GoTypes:           file_post_proto_goTypes,
-		DependencyIndexes: file_post_proto_depIdxs,
-		MessageInfos:      file_post_proto_msgTypes,
+		GoTypes:           file_user_proto_goTypes,
+		DependencyIndexes: file_user_proto_depIdxs,
+		MessageInfos:      file_user_proto_msgTypes,
 	}.Build()
-	File_post_proto = out.File
-	file_post_proto_goTypes = nil
-	file_post_proto_depIdxs = nil
+	File_user_proto = out.File
+	file_user_proto_goTypes = nil
+	file_user_proto_depIdxs = nil
 }

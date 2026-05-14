@@ -7,18 +7,22 @@ package postclient
 import (
 	"context"
 
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week10/zero-service/post/post/post"
+	"zero-service/post/post"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"
 )
 
 type (
-	GetpostReq       = post.GetpostReq
-	GetpostResp      = post.GetpostResp
-	GetpostResp_Post = post.GetpostResp_Post
+	GetpostReq             = post.GetpostReq
+	GetpostResp            = post.GetpostResp
+	GetpostResp_Post       = post.GetpostResp_Post
+	GetpostbyuserReq       = post.GetpostbyuserReq
+	GetpostbyuserResp      = post.GetpostbyuserResp
+	GetpostbyuserResp_Post = post.GetpostbyuserResp_Post
 
 	Post interface {
+		Getpostbyuser(ctx context.Context, in *GetpostbyuserReq, opts ...grpc.CallOption) (*GetpostbyuserResp, error)
 		Getpost(ctx context.Context, in *GetpostReq, opts ...grpc.CallOption) (*GetpostResp, error)
 	}
 
@@ -31,6 +35,11 @@ func NewPost(cli zrpc.Client) Post {
 	return &defaultPost{
 		cli: cli,
 	}
+}
+
+func (m *defaultPost) Getpostbyuser(ctx context.Context, in *GetpostbyuserReq, opts ...grpc.CallOption) (*GetpostbyuserResp, error) {
+	client := post.NewPostClient(m.cli.Conn())
+	return client.Getpostbyuser(ctx, in, opts...)
 }
 
 func (m *defaultPost) Getpost(ctx context.Context, in *GetpostReq, opts ...grpc.CallOption) (*GetpostResp, error) {

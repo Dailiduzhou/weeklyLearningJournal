@@ -16,6 +16,5 @@ type Config struct {
 	Cache cache.CacheConf
 
 	BizRedis redis.RedisConf
-
-	PostRpc zrpc.RpcClientConf
+	PostRpc  zrpc.RpcClientConf
 }

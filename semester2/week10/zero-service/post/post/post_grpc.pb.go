@@ -19,13 +19,15 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Post_Getpost_FullMethodName = "/post.Post/Getpost"
+	Post_Getpostbyuser_FullMethodName = "/post.Post/Getpostbyuser"
+	Post_Getpost_FullMethodName       = "/post.Post/Getpost"
 )
 
 // PostClient is the client API for Post service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type PostClient interface {
+	Getpostbyuser(ctx context.Context, in *GetpostbyuserReq, opts ...grpc.CallOption) (*GetpostbyuserResp, error)
 	Getpost(ctx context.Context, in *GetpostReq, opts ...grpc.CallOption) (*GetpostResp, error)
 }
 
@@ -35,6 +37,16 @@ type postClient struct {
 
 func NewPostClient(cc grpc.ClientConnInterface) PostClient {
 	return &postClient{cc}
+}
+
+func (c *postClient) Getpostbyuser(ctx context.Context, in *GetpostbyuserReq, opts ...grpc.CallOption) (*GetpostbyuserResp, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetpostbyuserResp)
+	err := c.cc.Invoke(ctx, Post_Getpostbyuser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *postClient) Getpost(ctx context.Context, in *GetpostReq, opts ...grpc.CallOption) (*GetpostResp, error) {
@@ -51,6 +63,7 @@ func (c *postClient) Getpost(ctx context.Context, in *GetpostReq, opts ...grpc.C
 // All implementations must embed UnimplementedPostServer
 // for forward compatibility.
 type PostServer interface {
+	Getpostbyuser(context.Context, *GetpostbyuserReq) (*GetpostbyuserResp, error)
 	Getpost(context.Context, *GetpostReq) (*GetpostResp, error)
 	mustEmbedUnimplementedPostServer()
 }
@@ -62,6 +75,9 @@ type PostServer interface {
 // pointer dereference when methods are called.
 type UnimplementedPostServer struct{}
 
+func (UnimplementedPostServer) Getpostbyuser(context.Context, *GetpostbyuserReq) (*GetpostbyuserResp, error) {
+	return nil, status.Error(codes.Unimplemented, "method Getpostbyuser not implemented")
+}
 func (UnimplementedPostServer) Getpost(context.Context, *GetpostReq) (*GetpostResp, error) {
 	return nil, status.Error(codes.Unimplemented, "method Getpost not implemented")
 }
@@ -84,6 +100,24 @@ func RegisterPostServer(s grpc.ServiceRegistrar, srv PostServer) {
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&Post_ServiceDesc, srv)
+}
+
+func _Post_Getpostbyuser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetpostbyuserReq)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(PostServer).Getpostbyuser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Post_Getpostbyuser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(PostServer).Getpostbyuser(ctx, req.(*GetpostbyuserReq))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _Post_Getpost_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -111,6 +145,10 @@ var Post_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "post.Post",
 	HandlerType: (*PostServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "Getpostbyuser",
+			Handler:    _Post_Getpostbyuser_Handler,
+		},
 		{
 			MethodName: "Getpost",
 			Handler:    _Post_Getpost_Handler,

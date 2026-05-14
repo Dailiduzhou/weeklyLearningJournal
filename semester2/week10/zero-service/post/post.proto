@@ -3,18 +3,31 @@ syntax = "proto3";
 package post;
 option go_package="./post";
 
-message GetpostReq {
+message GetpostbyuserReq {
   int64 userid = 1;
+}
+
+message GetpostbyuserResp {
+  message Post {
+      int64 id = 1;
+      string name = 2;
+  };
+  repeated Post posts = 1;
+}
+
+message GetpostReq {
+  int64 id = 1;
 }
 
 message GetpostResp {
   message Post {
-    int64 id = 1;
-    string name = 2;
+      int64 id = 1;
+      string name = 2;
   };
   repeated Post posts = 1;
 }
 
 service Post {
+  rpc Getpostbyuser(GetpostbyuserReq) returns (GetpostbyuserResp);
   rpc Getpost(GetpostReq) returns (GetpostResp);
 }

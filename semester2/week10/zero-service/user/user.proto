@@ -1,22 +1,20 @@
-
 syntax = "proto3";
 
 package user;
 option go_package="./user";
 
-message QueryReq {
-  int64 id = 1;
+message GetpostReq {
+  int64 userid = 1;
 }
 
-message QueryResp {
-  int64 id = 1;
+message GetpostResp {
   message Post {
     int64 id = 1;
     string name = 2;
   };
-  repeated Post posts = 2;
+  repeated Post posts = 1;
 }
 
-service User {
-  rpc Query(QueryReq) returns (QueryResp);
+service Post {
+  rpc Getpost(GetpostReq) returns (GetpostResp);
 }

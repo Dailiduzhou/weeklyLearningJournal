@@ -7,9 +7,9 @@ package server
 import (
 	"context"
 
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week10/zero-service/post/internal/logic"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week10/zero-service/post/internal/svc"
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week10/zero-service/post/post/post"
+	"zero-service/post/internal/logic"
+	"zero-service/post/internal/svc"
+	"zero-service/post/post"
 )
 
 type PostServer struct {
@@ -21,6 +21,11 @@ func NewPostServer(svcCtx *svc.ServiceContext) *PostServer {
 	return &PostServer{
 		svcCtx: svcCtx,
 	}
+}
+
+func (s *PostServer) Getpostbyuser(ctx context.Context, in *post.GetpostbyuserReq) (*post.GetpostbyuserResp, error) {
+	l := logic.NewGetpostbyuserLogic(ctx, s.svcCtx)
+	return l.Getpostbyuser(in)
 }
 
 func (s *PostServer) Getpost(ctx context.Context, in *post.GetpostReq) (*post.GetpostResp, error) {

@@ -7,19 +7,18 @@ package userclient
 import (
 	"context"
 
-	"github.com/Dailiduzhou/weeklyLearningJournal/semester2/week10/zero-service/user/user/user"
+	"zero-service/user/user"
 
 	"github.com/zeromicro/go-zero/zrpc"
 	"google.golang.org/grpc"
 )
 
 type (
-	QueryReq       = user.QueryReq
-	QueryResp      = user.QueryResp
-	QueryResp_Post = user.QueryResp_Post
+	Request  = user.Request
+	Response = user.Response
 
 	User interface {
-		Query(ctx context.Context, in *QueryReq, opts ...grpc.CallOption) (*QueryResp, error)
+		Ping(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error)
 	}
 
 	defaultUser struct {
@@ -33,7 +32,7 @@ func NewUser(cli zrpc.Client) User {
 	}
 }
 
-func (m *defaultUser) Query(ctx context.Context, in *QueryReq, opts ...grpc.CallOption) (*QueryResp, error) {
+func (m *defaultUser) Ping(ctx context.Context, in *Request, opts ...grpc.CallOption) (*Response, error) {
 	client := user.NewUserClient(m.cli.Conn())
-	return client.Query(ctx, in, opts...)
+	return client.Ping(ctx, in, opts...)
 }
