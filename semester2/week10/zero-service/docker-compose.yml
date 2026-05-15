@@ -92,6 +92,24 @@ services:
       - zero-network
     restart: unless-stopped
 
+  gateway:
+    build:
+      context: .
+      dockerfile: gateway/Dockerfile
+    container_name: zero-gateway
+    depends_on:
+      etcd:
+        condition: service_healthy
+      user-service:
+        condition: service_started
+      post-service:
+        condition: service_started
+    ports:
+      - "8888:8888"
+    networks:
+      - zero-network
+    restart: unless-stopped
+
 volumes:
   mysql_data:
 

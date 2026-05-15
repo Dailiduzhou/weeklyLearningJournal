@@ -1,0 +1,22 @@
+
+Æ
+
+post.protopost"*
+GetpostbyuserReq
+userid (Ruserid"s
+GetpostbyuserResp2
+posts (2.post.GetpostbyuserResp.PostRposts*
+Post
+id (Rid
+name (	Rname"
+
+GetpostReq
+id (Rid"g
+GetpostResp,
+posts (2.post.GetpostResp.PostRposts*
+Post
+id (Rid
+name (	Rname2x
+Post@
+Getpostbyuser.post.GetpostbyuserReq.post.GetpostbyuserResp.
+Getpost.post.GetpostReq.post.GetpostRespBZ./postbproto3
