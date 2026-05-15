@@ -26,6 +26,8 @@ ENV TZ Asia/Shanghai
 WORKDIR /app
 COPY --from=builder /app/gateway /app/gateway
 COPY gateway/etc /app/etc
+COPY user/user.pb.protoset /app/user.proto.protoset
+COPY post/post.pb.protoset /app/post.proto.protoset
 
 EXPOSE 8888
 CMD ["./gateway", "-f", "etc/gateway.yaml"]
