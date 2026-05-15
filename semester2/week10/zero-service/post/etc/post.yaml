@@ -1,5 +1,6 @@
 Name: post.rpc
 ListenOn: 0.0.0.0:9001
+Mode: dev
 Etcd:
   Hosts:
   - etcd:2379
@@ -9,6 +10,7 @@ Redis:
   Host: redis:6379
   Type: node
   Pass: ""
+  Key: post.rpc
 
 DB:
   DataSource: root@123456(mysql:3306)/post?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai

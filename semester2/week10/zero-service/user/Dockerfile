@@ -5,7 +5,8 @@ LABEL stage=gobuilder
 ENV CGO_ENABLED 0
 ENV GOPROXY https://goproxy.cn,direct
 
-RUN apk add --no-cache ca-certificates tzdata
+RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.ustc.edu.cn/g' /etc/apk/repositories && \
+    apk add --no-cache tzdata
 
 WORKDIR /build
 

@@ -1,24 +1,28 @@
-Name: gateway-example # gateway name
-Host: localhost # gateway host
-Port: 8888 # gateway port
-Upstreams: # upstreams
+Name: gateway-example
+Host: 0.0.0.0
+Port: 8888
+Upstreams:
   - Name: User
-    Grpc: # grpc upstream
+    Grpc:
       Etcd:
         Hosts:
           - etcd:2379
-      Key: user.rpc
+        Key: user.rpc
+    ProtoSets:
+      - user.proto.protoset
     Mappings:
       - Method: POST
         Path: api/user/getpostbyuser
         RpcPath: user.Post/Getpost
 
   - Name: Post
-    Grpc: # grpc upstream
+    Grpc:
       Etcd:
         Hosts:
           - etcd:2379
-      Key: post.rpc
+        Key: post.rpc
+    ProtoSets:
+      - post.proto.protoset
     Mappings:
       - Method: POST
         Path: api/post/getpost
