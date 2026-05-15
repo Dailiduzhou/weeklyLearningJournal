@@ -27,7 +27,7 @@ func NewGetpostLogic(ctx context.Context, svcCtx *svc.ServiceContext) *GetpostLo
 }
 
 func (l *GetpostLogic) Getpost(in *user.GetpostReq) (*user.GetpostResp, error) {
-	user, err := l.svcCtx.UserModel.FindOne(l.ctx, in.Userid)
+	_, err := l.svcCtx.UserModel.FindOne(l.ctx, in.Userid)
 	if err != nil {
 		if errors.Is(err, model.ErrNotFound) {
 			logx.Errorf("用户不存在: %s", in.Userid)
@@ -42,5 +42,12 @@ func (l *GetpostLogic) Getpost(in *user.GetpostReq) (*user.GetpostResp, error) {
 		return nil, errors.Wrapf(err, "Post RPC调用失败")
 	}
 
-	return &user.GetpostResp{}, nil
+	posts := make([]*user.GetpostResp_Post, len(postResp.Posts))
+	for i, p := range postResp.Posts {
+		posts[i] = &user.GetpostResp_Post{
+			Id:   p.Id,
+			Name: p.Name,
+		}
+	}
+	return &user.GetpostResp{Posts: posts}, nil
 }
