@@ -17,7 +17,7 @@ type ServiceContext struct {
 func NewServiceContext(c config.Config) *ServiceContext {
 	conn := sqlx.NewMysql(c.DB.DataSource)
 
-	redis := redis.MustNewRedis(c.Redis.RedisConf)
+	redis := redis.MustNewRedis(c.BizRedis)
 
 	return &ServiceContext{
 		Config:    c,

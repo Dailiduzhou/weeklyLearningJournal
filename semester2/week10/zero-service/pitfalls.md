@@ -18,6 +18,11 @@ cd user
 goctl rpc protoc -go_out=. -go-grpc_out=. -zrpc_out=.
 ```
 
+## Redis字段冲突
+
+`zrpc.RpcServerConf`中有`Redis`字段，所以在`/etc/XXX.yaml`中需要用`BizRedis`来避免冲突
+
+
 ## grpc互相调用
 即使定义是是用**XXX**的，在`goctl rpc protoc`生成之后，包名可能会出现`client`后缀。
 
