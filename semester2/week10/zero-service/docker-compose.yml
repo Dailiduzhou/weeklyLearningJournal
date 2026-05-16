@@ -43,6 +43,8 @@ services:
       - ALLOW_NONE_AUTHENTICATION=yes
       - ETCD_ADVERTISE_CLIENT_URLS=http://etcd:2379
       - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - NO_PROXY=etcd,mysql,redis,localhost,127.0.0.1
+      - no_proxy=etcd,mysql,redis,localhost,127.0.0.1
     ports:
       - "2379:2379"
     networks:
@@ -59,6 +61,11 @@ services:
       context: .
       dockerfile: user/Dockerfile
     container_name: zero-user-service
+    environment:
+      - NO_PROXY=etcd,mysql,redis,localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - no_proxy=etcd,mysql,redis,localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+    volumes:
+      - ./user/etc:/app/etc
     depends_on:
       mysql:
         condition: service_healthy
@@ -77,6 +84,11 @@ services:
       context: .
       dockerfile: post/Dockerfile
     container_name: zero-post-service
+    environment:
+      - NO_PROXY=etcd,mysql,redis,localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - no_proxy=etcd,mysql,redis,localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+    volumes:
+      - ./post/etc:/app/etc
     depends_on:
       mysql:
         condition: service_healthy
@@ -97,6 +109,9 @@ services:
       context: .
       dockerfile: gateway/Dockerfile
     container_name: zero-gateway
+    environment:
+      - NO_PROXY=etcd,mysql,redis,localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+      - no_proxy=etcd,mysql,redis,localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
     depends_on:
       etcd:
         condition: service_healthy

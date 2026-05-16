@@ -12,7 +12,7 @@ Upstreams:
       - user.proto.protoset
     Mappings:
       - Method: POST
-        Path: api/user/getpostbyuser
+        Path: /api/user/getpostbyuser
         RpcPath: user.Post/Getpost
 
   - Name: Post
@@ -25,5 +25,5 @@ Upstreams:
       - post.proto.protoset
     Mappings:
       - Method: POST
-        Path: api/post/getpost
+        Path: /api/post/getpost
         RpcPath: post.Post/Getpost

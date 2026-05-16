@@ -13,7 +13,7 @@ Redis:
   Key: post.rpc
 
 DB:
-  DataSource: root@123456(mysql:3306)/post?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai
+  DataSource: root:123456@tcp(mysql:3306)/post?charset=utf8mb4&parseTime=true&loc=Asia%2FShanghai
 Cache:
   - Host: redis:6379
     Pass: ""
