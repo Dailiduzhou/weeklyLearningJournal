@@ -32,7 +32,7 @@ spec:
               value: etcd,mysql,redis,localhost,127.0.0.1
             - name: no_proxy
               value: etcd,mysql,redis,localhost,127.0.0.1
-          image: docker.io/bitnami/etcd:3.5
+          image: bitnami/etcd:3.5
           livenessProbe:
             exec:
               command:

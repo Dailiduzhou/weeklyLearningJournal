@@ -1,0 +1,7 @@
+POST http://localhost:8889/api/user/getpostbyuser
+Content-Type: application/json
+@user.json
+
+POST http://localhost:8889/api/post/getpost
+Content-Type: application/json
+@post.json
