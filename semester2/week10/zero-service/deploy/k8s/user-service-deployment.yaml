@@ -1,0 +1,43 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    kompose.cmd: kompose convert
+    kompose.version: 1.38.0 (HEAD)
+  labels:
+    io.kompose.service: user-service
+  name: user-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      io.kompose.service: user-service
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        kompose.cmd: kompose convert
+        kompose.version: 1.38.0 (HEAD)
+      labels:
+        io.kompose.service: user-service
+    spec:
+      containers:
+        - env:
+            - name: NO_PROXY
+              value: etcd,mysql,redis,localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+            - name: no_proxy
+              value: etcd,mysql,redis,localhost,127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
+          image: user-service
+          name: zero-user-service
+          ports:
+            - containerPort: 8080
+              protocol: TCP
+          volumeMounts:
+            - mountPath: /app/etc
+              name: user-service-cm0
+      restartPolicy: Always
+      volumes:
+        - configMap:
+            name: user-service-cm0
+          name: user-service-cm0

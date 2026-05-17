@@ -1,0 +1,8 @@
+apiVersion: v1
+data:
+  init.sql: "-- 初始化 user 数据库\nCREATE DATABASE IF NOT EXISTS user CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\n\nUSE user;\n\n-- 创建 user 表\nCREATE TABLE IF NOT EXISTS `user` (\n    `id` BIGINT NOT NULL AUTO_INCREMENT,\n    PRIMARY KEY (`id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n\n-- 插入测试用户 (id=1)\nINSERT INTO `user` (`id`) VALUES (1);\n\n-- 初始化 post 数据库\nCREATE DATABASE IF NOT EXISTS post CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;\n\nUSE post;\n\n-- 创建 post 表\nCREATE TABLE IF NOT EXISTS `post` (\n    `id` BIGINT NOT NULL AUTO_INCREMENT,\n    `userid` BIGINT NOT NULL,\n    `name` VARCHAR(255) NOT NULL,\n    PRIMARY KEY (`id`)\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;\n\n-- 插入测试帖子 (user_id=1 的 3 个 posts)\nINSERT INTO `post` (`userid`, `name`) VALUES \n    (1, '第一篇帖子'),\n    (1, '第二篇帖子'),\n    (1, '第三篇帖子');\n"
+kind: ConfigMap
+metadata:
+  labels:
+    io.kompose.service: mysql
+  name: mysql-cm1
