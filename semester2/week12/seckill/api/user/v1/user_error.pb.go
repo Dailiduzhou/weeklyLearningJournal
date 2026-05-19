@@ -26,15 +26,18 @@ type UserErrorReason int32
 
 const (
 	UserErrorReason_USER_NOT_FOUND UserErrorReason = 0
+	UserErrorReason_LOW_BALANCE    UserErrorReason = 1
 )
 
 // Enum value maps for UserErrorReason.
 var (
 	UserErrorReason_name = map[int32]string{
 		0: "USER_NOT_FOUND",
+		1: "LOW_BALANCE",
 	}
 	UserErrorReason_value = map[string]int32{
 		"USER_NOT_FOUND": 0,
+		"LOW_BALANCE":    1,
 	}
 )
 
@@ -69,9 +72,10 @@ var File_api_user_v1_user_error_proto protoreflect.FileDescriptor
 
 const file_api_user_v1_user_error_proto_rawDesc = "" +
 	"\n" +
-	"\x1capi/user/v1/user_error.proto\x12\vapi.user.v1\x1a\x13errors/errors.proto*1\n" +
+	"\x1capi/user/v1/user_error.proto\x12\vapi.user.v1\x1a\x13errors/errors.proto*H\n" +
 	"\x0fUserErrorReason\x12\x18\n" +
-	"\x0eUSER_NOT_FOUND\x10\x00\x1a\x04\xa8E\x94\x03\x1a\x04\xa0E\xf4\x03B\x18Z\x16seckill/api/user/v1;v1b\x06proto3"
+	"\x0eUSER_NOT_FOUND\x10\x00\x1a\x04\xa8E\x94\x03\x12\x15\n" +
+	"\vLOW_BALANCE\x10\x01\x1a\x04\xa8E\x90\x03\x1a\x04\xa0E\xf4\x03B\x18Z\x16seckill/api/user/v1;v1b\x06proto3"
 
 var (
 	file_api_user_v1_user_error_proto_rawDescOnce sync.Once

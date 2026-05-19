@@ -3,12 +3,14 @@ package data
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"math/rand"
 	"time"
 
 	userv1 "seckill/api/user/v1"
 	"seckill/app/user/internal/biz"
+	"seckill/app/user/internal/data/db"
 
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
@@ -24,11 +26,11 @@ func NewUserRepo(data *Data) *UserRepo {
 }
 
 func (r *UserRepo) Create(ctx context.Context) (*biz.User, error) {
-	userID, err := r.data.q.CreatUser(ctx)
+	user, err := r.data.q.CreatUser(ctx)
 	if err != nil {
 		return nil, errors.InternalServer("DB_ERROR", "failed to create")
 	}
-	return &biz.User{ID: userID}, nil
+	return &biz.User{ID: user.ID, Balance: user.Balance}, nil
 }
 
 func (r *UserRepo) FindByID(ctx context.Context, ID int64) (*biz.User, error) {
@@ -38,9 +40,7 @@ func (r *UserRepo) FindByID(ctx context.Context, ID int64) (*biz.User, error) {
 	if err == nil {
 		return user, nil
 	}
-	if err != nil {
-		log.Errorf("Error get cache:%v", err)
-	}
+	log.Errorf("Error get cache:%v", err)
 
 	sfKey := fmt.Sprintf("sf:user:%d", ID)
 	val, err, _ := r.data.sg.Do(sfKey, func() (interface{}, error) {
@@ -59,16 +59,16 @@ func (r *UserRepo) FindByID(ctx context.Context, ID int64) (*biz.User, error) {
 		}
 
 		log.Infof("User %d fetching from DB", ID)
-		dbUserID, err := r.data.q.GetUser(ctx, ID)
+		dbUser, err := r.data.q.GetUser(ctx, ID)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				return nil, userv1.ErrorUserNotFound("User %d not found", ID)
 			}
 			return nil, errors.InternalServer("DB_ERROR", "failed to fetch user")
 		}
-		dbUser := &biz.User{ID: dbUserID}
-		r.setCache(ctx, cacheKey, dbUser)
-		return dbUser, nil
+		finaldbUser := &biz.User{ID: dbUser.ID, Balance: dbUser.Balance}
+		r.setCache(ctx, cacheKey, finaldbUser)
+		return finaldbUser, nil
 	})
 
 	if err != nil {
@@ -79,15 +79,44 @@ func (r *UserRepo) FindByID(ctx context.Context, ID int64) (*biz.User, error) {
 }
 
 func (r *UserRepo) getCache(ctx context.Context, key string) (*biz.User, error) {
-	val, err := r.data.rdb.Get(ctx, key).Int64()
+	val, err := r.data.rdb.Get(ctx, key).Bytes()
 	if err != nil {
 		return nil, err
 	}
-	return &biz.User{ID: val}, nil
+	var user biz.User
+	if err := json.Unmarshal(val, &user); err != nil {
+		return nil, err
+	}
+	return &user, nil
 }
 
 func (r *UserRepo) setCache(ctx context.Context, key string, user *biz.User) {
+	data, err := json.Marshal(user)
+	if err != nil {
+		log.Errorf("Error marshal user cache: %v", err)
+		return
+	}
 	jitter := time.Duration(rand.Int63n(10))
 	exp := jitter + 10*time.Minute
-	r.data.rdb.Set(ctx, key, user.ID, exp)
+	r.data.rdb.Set(ctx, key, data, exp)
+}
+
+func (r *UserRepo) DeducBalance(ctx context.Context, ID int64, amount int32) error {
+	n, err := r.data.q.DeductBalance(ctx, db.DeductBalanceParams{
+		ID:      ID,
+		Balance: amount,
+	})
+	if err != nil {
+		return errors.InternalServer("DB_ERROR", "failed to deduct balance")
+	}
+	if n == 0 {
+		return userv1.ErrorLowBalance("user %d not found or insufficient balance", ID)
+	}
+
+	cacheKey := fmt.Sprintf("user:%d", ID)
+	if err := r.data.rdb.Del(ctx, cacheKey).Err(); err != nil {
+		log.Errorf("Error delete cache after deduct: %v", err)
+	}
+
+	return nil
 }

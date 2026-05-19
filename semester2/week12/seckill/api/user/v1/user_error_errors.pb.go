@@ -22,3 +22,15 @@ func IsUserNotFound(err error) bool {
 func ErrorUserNotFound(format string, args ...interface{}) *errors.Error {
 	return errors.New(404, UserErrorReason_USER_NOT_FOUND.String(), fmt.Sprintf(format, args...))
 }
+
+func IsLowBalance(err error) bool {
+	if err == nil {
+		return false
+	}
+	e := errors.FromError(err)
+	return e.Reason == UserErrorReason_LOW_BALANCE.String() && e.Code == 400
+}
+
+func ErrorLowBalance(format string, args ...interface{}) *errors.Error {
+	return errors.New(400, UserErrorReason_LOW_BALANCE.String(), fmt.Sprintf(format, args...))
+}

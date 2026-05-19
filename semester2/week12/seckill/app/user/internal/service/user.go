@@ -32,3 +32,11 @@ func (s *UserService) GetUser(ctx context.Context, req *pb.GetUserRequest) (*pb.
 
 	return &pb.GetUserReply{Id: user.ID}, nil
 }
+
+func (s *UserService) DeductBalance(ctx context.Context, req *pb.DeductBalanceRequest) (*pb.DeductBalanceReply, error) {
+	err := s.uc.DeducBalance(ctx, req.Id, int32(req.Amount))
+	if err != nil {
+		return &pb.DeductBalanceReply{Success: false}, err
+	}
+	return &pb.DeductBalanceReply{Success: true}, nil
+}

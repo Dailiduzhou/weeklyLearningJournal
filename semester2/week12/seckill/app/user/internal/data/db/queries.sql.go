@@ -20,6 +20,23 @@ func (q *Queries) CreatUser(ctx context.Context) (User, error) {
 	return i, err
 }
 
+const deductBalance = `-- name: DeductBalance :execrows
+UPDATE users SET balance = balance - $2 WHERE id = $1 AND balance >= $2
+`
+
+type DeductBalanceParams struct {
+	ID      int64
+	Balance int32
+}
+
+func (q *Queries) DeductBalance(ctx context.Context, arg DeductBalanceParams) (int64, error) {
+	result, err := q.db.ExecContext(ctx, deductBalance, arg.ID, arg.Balance)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected()
+}
+
 const getUser = `-- name: GetUser :one
 SELECT id, balance FROM users WHERE id = $1 LIMIT 1
 `
