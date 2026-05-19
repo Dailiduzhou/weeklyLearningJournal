@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"time"
 
+	productv1 "seckill/api/product/v1"
 	"seckill/app/product/internal/biz"
 	"seckill/app/product/internal/data/db"
 
@@ -74,11 +75,23 @@ func (r *ProductRepo) FindByID(ctx context.Context, ID int64) (*biz.Product, err
 }
 
 func (r *ProductRepo) DeductStock(ctx context.Context, ID int64, amount int32) error {
-	cacheKey := fmt.Sprintf("product:%d", ID)
-
 	rows, err := r.data.q.DeductStock(ctx, db.DeductStockParams{
-		ID: int64,
+		ID:    ID,
+		Stock: amount,
 	})
+	if err != nil {
+		return errors.InternalServer("DB_ERROR", "failed to deduct stock")
+	}
+	if rows == 0 {
+		return productv1.ErrorSoldOut("product %d sold out or not found", ID)
+	}
+
+	cacheKey := fmt.Sprintf("product:%d", ID)
+	if err := r.data.rdb.Del(ctx, cacheKey).Err(); err != nil {
+		log.Errorf("Error delete cache after deduct: %v", err)
+	}
+
+	return nil
 }
 
 func (r *ProductRepo) getCache(ctx context.Context, key string) (*biz.Product, error) {

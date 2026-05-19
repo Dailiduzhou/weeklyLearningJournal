@@ -19,8 +19,8 @@ type ProductUsecase struct {
 	repo ProductRepo
 }
 
-func NewProductUsecase(repo *ProductRepo) *ProductUsecase {
-	return &ProductUsecase{repo: *repo}
+func NewProductUsecase(repo ProductRepo) *ProductUsecase {
+	return &ProductUsecase{repo: repo}
 }
 
 func (uc *ProductUsecase) Seckill(ctx context.Context) error {

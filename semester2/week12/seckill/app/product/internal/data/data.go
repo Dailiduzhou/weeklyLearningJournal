@@ -5,9 +5,9 @@ import (
 	"database/sql"
 
 	uv1 "seckill/api/user/v1"
+	"seckill/app/product/internal/biz"
 	"seckill/app/product/internal/conf"
 	"seckill/app/product/internal/data/db"
-	"seckill/app/product/internal/server"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-redis/redis/v8"
@@ -18,7 +18,7 @@ import (
 )
 
 // ProviderSet is data providers.
-var ProviderSet = wire.NewSet(NewData, NewProductRepo, server.NewUserClient)
+var ProviderSet = wire.NewSet(NewData, NewProductRepo, wire.Bind(new(biz.ProductRepo), new(*ProductRepo)))
 
 // Data .
 type Data struct {
@@ -31,7 +31,7 @@ type Data struct {
 }
 
 // NewData .
-func NewData(c *conf.Data, userclient *uv1.UserClient) (*Data, func(), error) {
+func NewData(c *conf.Data, userclient uv1.UserClient) (*Data, func(), error) {
 	sqldb, err := sql.Open("pgx", c.Database.Source)
 	if err != nil {
 		panic("error connecting db")
@@ -62,6 +62,6 @@ func NewData(c *conf.Data, userclient *uv1.UserClient) (*Data, func(), error) {
 		rs:         rs,
 		q:          db.New(sqldb),
 		sg:         &singleflight.Group{},
-		userclient: userclient,
+		userclient: &userclient,
 	}, cleanup, nil
 }

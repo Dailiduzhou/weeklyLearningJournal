@@ -7,13 +7,13 @@
 package main
 
 import (
+	"github.com/go-kratos/kratos/v2"
+	"github.com/go-kratos/kratos/v2/log"
 	"seckill/app/product/internal/biz"
 	"seckill/app/product/internal/conf"
 	"seckill/app/product/internal/data"
 	"seckill/app/product/internal/server"
 	"seckill/app/product/internal/service"
-	"github.com/go-kratos/kratos/v2"
-	"github.com/go-kratos/kratos/v2/log"
 )
 
 import (
@@ -23,17 +23,21 @@ import (
 // Injectors from wire.go:
 
 // wireApp init kratos application.
-func wireApp(confServer *conf.Server, confData *conf.Data, logger log.Logger) (*kratos.App, func(), error) {
-	dataData, cleanup, err := data.NewData(confData)
+func wireApp(confServer *conf.Server, confData *conf.Data, registry *conf.Registry, logger log.Logger) (*kratos.App, func(), error) {
+	client := server.NewEtcdClient(registry)
+	discovery := server.NewDiscovery(client)
+	userClient := server.NewUserClient(discovery)
+	dataData, cleanup, err := data.NewData(confData, userClient)
 	if err != nil {
 		return nil, nil, err
 	}
-	greeterRepo := data.NewGreeterRepo(dataData, logger)
-	greeterUsecase := biz.NewGreeterUsecase(greeterRepo)
-	greeterService := service.NewGreeterService(greeterUsecase)
-	grpcServer := server.NewGRPCServer(confServer, greeterService, logger)
-	httpServer := server.NewHTTPServer(confServer, greeterService, logger)
-	app := newApp(logger, grpcServer, httpServer)
+	productRepo := data.NewProductRepo(dataData)
+	productUsecase := biz.NewProductUsecase(productRepo)
+	productService := service.NewProductService(productUsecase)
+	grpcServer := server.NewGRPCServer(confServer, productService, logger)
+	httpServer := server.NewHTTPServer(confServer, productService, logger)
+	registrar := server.NewRegistrar(client)
+	app := newApp(logger, grpcServer, httpServer, registrar)
 	return app, func() {
 		cleanup()
 	}, nil
