@@ -61,8 +61,8 @@ func (r *ProductRepo) FindByID(ctx context.Context, ID int64) (*biz.Product, err
 		}
 		finalProduct := &biz.Product{
 			ID:    dbProduct.ID,
-			Price: dbProduct.Price.(int32),
-			Stock: dbProduct.Stock.(int32),
+			Price: dbProduct.Price,
+			Stock: dbProduct.Stock,
 		}
 		r.setCache(ctx, cacheKey, finalProduct)
 		return finalProduct, nil

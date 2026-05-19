@@ -1,6 +1,6 @@
 module seckill
 
-go 1.26.3
+go 1.25.0
 
 require (
 	github.com/go-kratos/kratos/contrib/registry/etcd/v2 v2.0.0-20260404020628-f149714c1d54
