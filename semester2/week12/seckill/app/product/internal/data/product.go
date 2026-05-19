@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"seckill/app/product/internal/biz"
+	"seckill/app/product/internal/data/db"
 
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
@@ -70,6 +71,14 @@ func (r *ProductRepo) FindByID(ctx context.Context, ID int64) (*biz.Product, err
 	}
 
 	return val.(*biz.Product), nil
+}
+
+func (r *ProductRepo) DeductStock(ctx context.Context, ID int64, amount int32) error {
+	cacheKey := fmt.Sprintf("product:%d", ID)
+
+	rows, err := r.data.q.DeductStock(ctx, db.DeductStockParams{
+		ID: int64,
+	})
 }
 
 func (r *ProductRepo) getCache(ctx context.Context, key string) (*biz.Product, error) {
