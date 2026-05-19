@@ -2,18 +2,18 @@ package data
 
 import (
 	"context"
-	"errors"
+	"database/sql"
 	"fmt"
 	"math/rand"
 	"time"
 
+	userv1 "seckill/api/user/v1"
 	"seckill/app/user/internal/biz"
 
+	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/go-redsync/redsync/v4"
 )
-
-var USER_NOT_FOUND = errors.New("USER_NOT_FOUND")
 
 type UserRepo struct {
 	data *Data
@@ -26,7 +26,7 @@ func NewUserRepo(data *Data) *UserRepo {
 func (r *UserRepo) Create(ctx context.Context) (*biz.User, error) {
 	userID, err := r.data.q.CreatUser(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.InternalServer("DB_ERROR", "failed to create")
 	}
 	return &biz.User{ID: userID}, nil
 }
@@ -61,7 +61,10 @@ func (r *UserRepo) FindByID(ctx context.Context, ID int64) (*biz.User, error) {
 		log.Infof("User %d fetching from DB", ID)
 		dbUserID, err := r.data.q.GetUser(ctx, ID)
 		if err != nil {
-			return nil, USER_NOT_FOUND
+			if err == sql.ErrNoRows {
+				return nil, userv1.ErrorUserNotFound("User %d not found", ID)
+			}
+			return nil, errors.InternalServer("DB_ERROR", "failed to fetch user")
 		}
 		dbUser := &biz.User{ID: dbUserID}
 		r.setCache(ctx, cacheKey, dbUser)
