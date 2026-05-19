@@ -39,3 +39,10 @@ message Data {
   Database database = 1;
   Redis redis = 2;
 }
+
+message Registry {
+  message Etcd {
+    repeated string endpoints = 1;
+  }
+  Etcd etcd = 1;
+}
