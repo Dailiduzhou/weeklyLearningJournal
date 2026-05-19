@@ -27,7 +27,7 @@ type ProductHTTPServer interface {
 
 func RegisterProductHTTPServer(s *http.Server, srv ProductHTTPServer) {
 	r := s.Route("/")
-	r.GET("/api/seckill", _Product_Seckill0_HTTP_Handler(srv))
+	r.POST("/api/seckill", _Product_Seckill0_HTTP_Handler(srv))
 }
 
 func _Product_Seckill0_HTTP_Handler(srv ProductHTTPServer) func(ctx http.Context) error {
@@ -70,7 +70,7 @@ func (c *ProductHTTPClientImpl) Seckill(ctx context.Context, in *SeckillReq, opt
 	path := binding.EncodeURL(pattern, in, false)
 	opts = append(opts, http.Operation(OperationProductSeckill))
 	opts = append(opts, http.PathTemplate(pattern))
-	err := c.cc.Invoke(ctx, "GET", path, in, &out, opts...)
+	err := c.cc.Invoke(ctx, "POST", path, in, &out, opts...)
 	if err != nil {
 		return nil, err
 	}

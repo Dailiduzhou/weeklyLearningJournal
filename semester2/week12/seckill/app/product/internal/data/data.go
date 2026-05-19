@@ -8,12 +8,10 @@ import (
 )
 
 // ProviderSet is data providers.
-var ProviderSet = wire.NewSet(NewData, NewGreeterRepo)
+var ProviderSet = wire.NewSet(NewData, NewProductRepo)
 
 // Data .
-type Data struct {
-	// TODO wrapped database client
-}
+type Data struct{}
 
 // NewData .
 func NewData(c *conf.Data) (*Data, func(), error) {

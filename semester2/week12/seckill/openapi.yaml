@@ -3,19 +3,19 @@
 
 openapi: 3.0.3
 info:
-    title: User API
+    title: Product API
     version: 0.0.1
 paths:
-    /api/register:
+    /api/seckill:
         post:
             tags:
-                - User
-            operationId: User_Register
+                - Product
+            operationId: Product_Seckill
             requestBody:
                 content:
                     application/json:
                         schema:
-                            $ref: '#/components/schemas/CreateUserRequest'
+                            $ref: '#/components/schemas/SeckillReq'
                 required: true
             responses:
                 "200":
@@ -23,31 +23,7 @@ paths:
                     content:
                         application/json:
                             schema:
-                                $ref: '#/components/schemas/CreateUserReply'
-                default:
-                    description: Default error response
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/Status'
-    /api/user:
-        post:
-            tags:
-                - User
-            operationId: User_GetUser
-            requestBody:
-                content:
-                    application/json:
-                        schema:
-                            $ref: '#/components/schemas/GetUserRequest'
-                required: true
-            responses:
-                "200":
-                    description: OK
-                    content:
-                        application/json:
-                            schema:
-                                $ref: '#/components/schemas/GetUserReply'
+                                $ref: '#/components/schemas/SeckillResp'
                 default:
                     description: Default error response
                     content:
@@ -56,24 +32,6 @@ paths:
                                 $ref: '#/components/schemas/Status'
 components:
     schemas:
-        CreateUserReply:
-            type: object
-            properties:
-                id:
-                    type: string
-        CreateUserRequest:
-            type: object
-            properties: {}
-        GetUserReply:
-            type: object
-            properties:
-                id:
-                    type: string
-        GetUserRequest:
-            type: object
-            properties:
-                id:
-                    type: string
         GoogleProtobufAny:
             type: object
             properties:
@@ -82,6 +40,17 @@ components:
                     description: The type of the serialized message.
             additionalProperties: true
             description: Contains an arbitrary serialized message along with a @type that describes the type of the serialized message.
+        SeckillReq:
+            type: object
+            properties:
+                userID:
+                    type: string
+        SeckillResp:
+            type: object
+            properties:
+                res:
+                    type: integer
+                    format: enum
         Status:
             type: object
             properties:
@@ -99,4 +68,4 @@ components:
                     description: A list of messages that carry the error details.  There is a common set of message types for APIs to use.
             description: 'The `Status` type defines a logical error model that is suitable for different programming environments, including REST APIs and RPC APIs. It is used by [gRPC](https://github.com/grpc). Each `Status` message contains three pieces of data: error code, error message, and error details. You can find out more about this error model and how to work with it in the [API Design Guide](https://cloud.google.com/apis/design/errors).'
 tags:
-    - name: User
+    - name: Product

@@ -10,7 +10,7 @@ option java_package = "api.product.v1";
 service Product {
   rpc Seckill(SeckillReq) returns (SeckillResp) {
     option (google.api.http) = {
-        get: "/api/seckill"
+        post: "/api/seckill"
         body: "*"
     };
   }
@@ -21,7 +21,9 @@ enum Result {
   FAILURE = 1;
 }
 
-message SeckillReq {}
+message SeckillReq {
+  int64 userID = 1;
+}
 message SeckillResp {
   Result res = 1;
 }

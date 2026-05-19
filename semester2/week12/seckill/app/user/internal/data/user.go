@@ -96,7 +96,7 @@ func (r *UserRepo) setCache(ctx context.Context, key string, user *biz.User) {
 		log.Errorf("Error marshal user cache: %v", err)
 		return
 	}
-	jitter := time.Duration(rand.Int63n(10))
+	jitter := time.Duration(rand.Intn(10)) * time.Minute
 	exp := jitter + 10*time.Minute
 	r.data.rdb.Set(ctx, key, data, exp)
 }

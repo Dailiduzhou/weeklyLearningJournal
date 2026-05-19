@@ -70,6 +70,7 @@ func (Result) EnumDescriptor() ([]byte, []int) {
 
 type SeckillReq struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserID        int64                  `protobuf:"varint,1,opt,name=userID,proto3" json:"userID,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -102,6 +103,13 @@ func (x *SeckillReq) ProtoReflect() protoreflect.Message {
 // Deprecated: Use SeckillReq.ProtoReflect.Descriptor instead.
 func (*SeckillReq) Descriptor() ([]byte, []int) {
 	return file_api_product_v1_product_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *SeckillReq) GetUserID() int64 {
+	if x != nil {
+		return x.UserID
+	}
+	return 0
 }
 
 type SeckillResp struct {
@@ -152,16 +160,17 @@ var File_api_product_v1_product_proto protoreflect.FileDescriptor
 
 const file_api_product_v1_product_proto_rawDesc = "" +
 	"\n" +
-	"\x1capi/product/v1/product.proto\x12\x0eapi.product.v1\x1a\x1cgoogle/api/annotations.proto\"\f\n" +
+	"\x1capi/product/v1/product.proto\x12\x0eapi.product.v1\x1a\x1cgoogle/api/annotations.proto\"$\n" +
 	"\n" +
-	"SeckillReq\"7\n" +
+	"SeckillReq\x12\x16\n" +
+	"\x06userID\x18\x01 \x01(\x03R\x06userID\"7\n" +
 	"\vSeckillResp\x12(\n" +
 	"\x03res\x18\x01 \x01(\x0e2\x16.api.product.v1.ResultR\x03res*\"\n" +
 	"\x06Result\x12\v\n" +
 	"\aSUCCESS\x10\x00\x12\v\n" +
 	"\aFAILURE\x10\x012f\n" +
 	"\aProduct\x12[\n" +
-	"\aSeckill\x12\x1a.api.product.v1.SeckillReq\x1a\x1b.api.product.v1.SeckillResp\"\x17\x82\xd3\xe4\x93\x02\x11:\x01*\x12\f/api/seckillB-\n" +
+	"\aSeckill\x12\x1a.api.product.v1.SeckillReq\x1a\x1b.api.product.v1.SeckillResp\"\x17\x82\xd3\xe4\x93\x02\x11:\x01*\"\f/api/seckillB-\n" +
 	"\x0eapi.product.v1P\x01Z\x19seckill/api/product/v1;v1b\x06proto3"
 
 var (
