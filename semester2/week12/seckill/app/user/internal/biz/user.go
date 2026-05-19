@@ -3,7 +3,7 @@ package biz
 import "context"
 
 type User struct {
-	id int64
+	ID int64
 }
 
 type UserRepo interface {
