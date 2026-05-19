@@ -29,9 +29,9 @@ func NewProductRepo(data *Data) *ProductRepo {
 func (r *ProductRepo) FindByID(ctx context.Context, ID int64) (*biz.Product, error) {
 	cacheKey := fmt.Sprintf("product:%d", ID)
 
-	user, err := r.getCache(ctx, cacheKey)
+	product, err := r.getCache(ctx, cacheKey)
 	if err == nil {
-		return user, nil
+		return product, nil
 	}
 	log.Errorf("Error get cache:%v", err)
 
@@ -87,7 +87,18 @@ func (r *ProductRepo) DeductStock(ctx context.Context, userID int64, ID int64, a
 		return errors.InternalServer("USER_SERVICE_ERROR", "can't get user")
 	}
 
-	_, err = r.data.userclient.DeductBalance(ctx, &uv1.DeductBalanceRequest{Id: userID, Amount: 1000})
+	product, err := r.FindByID(ctx, ID)
+	if err != nil {
+		log.Errorf("DB_ERROR: %q", err)
+		return err
+	}
+
+	if product.Stock == 0 {
+		log.Infof("Product %d sold out", product.ID)
+		return productv1.ErrorSoldOut("Product %d sold out", product.ID)
+	}
+
+	_, err = r.data.userclient.DeductBalance(ctx, &uv1.DeductBalanceRequest{Id: userID, Amount: int64(product.Price)})
 	if err != nil {
 		if uv1.IsLowBalance(err) {
 			log.Errorf("User %d has insufficient balance", userID)

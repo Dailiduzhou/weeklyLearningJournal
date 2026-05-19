@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: seckill
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/pg-init:/docker-entrypoint-initdb.d
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  etcd:
+    image: bitnami/etcd:3.5
+    environment:
+      ALLOW_NONE_AUTHENTICATION: "yes"
+      ETCD_LISTEN_CLIENT_URLS: http://0.0.0.0:2379
+      ETCD_ADVERTISE_CLIENT_URLS: http://etcd:2379
+    ports:
+      - "2379:2379"
+
+  product:
+    build:
+      context: .
+      dockerfile: app/product/Dockerfile
+    ports:
+      - "8000:8000"
+      - "9000:9000"
+    volumes:
+      - ./app/product/configs:/data/conf
+    depends_on:
+      - postgres
+
+  user:
+    build:
+      context: .
+      dockerfile: app/user/Dockerfile
+    ports:
+      - "8001:8000"
+      - "9001:9000"
+    volumes:
+      - ./app/user/configs:/data/conf
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:
