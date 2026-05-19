@@ -9,6 +9,7 @@ import (
 	"time"
 
 	productv1 "seckill/api/product/v1"
+	uv1 "seckill/api/user/v1"
 	"seckill/app/product/internal/biz"
 	"seckill/app/product/internal/data/db"
 
@@ -74,7 +75,15 @@ func (r *ProductRepo) FindByID(ctx context.Context, ID int64) (*biz.Product, err
 	return val.(*biz.Product), nil
 }
 
-func (r *ProductRepo) DeductStock(ctx context.Context, ID int64, amount int32) error {
+func (r *ProductRepo) DeductStock(ctx context.Context, userID int64, ID int64, amount int32) error {
+	userReply, err := r.data.userclient.GetUser(ctx, &uv1.GetUserRequest{
+		Id: userID,
+	})
+	if err != nil {
+		if errors.Is(err, uv1.ErrorUserNotFound(, args ...interface{}))
+		return err
+	}
+
 	rows, err := r.data.q.DeductStock(ctx, db.DeductStockParams{
 		ID:    ID,
 		Stock: amount,

@@ -12,7 +12,7 @@ type Product struct {
 
 type ProductRepo interface {
 	FindByID(ctx context.Context, ID int64) (*Product, error)
-	DeductStock(ctx context.Context, ID int64, amount int32) error
+	DeductStock(ctx context.Context, userID int64, ID int64, amount int32) error
 }
 
 type ProductUsecase struct {
@@ -23,6 +23,6 @@ func NewProductUsecase(repo ProductRepo) *ProductUsecase {
 	return &ProductUsecase{repo: repo}
 }
 
-func (uc *ProductUsecase) Seckill(ctx context.Context) error {
-	return uc.repo.DeductStock(ctx, 1, 1)
+func (uc *ProductUsecase) Seckill(ctx context.Context, userID int64) error {
+	return uc.repo.DeductStock(ctx, userID, 1, 1)
 }

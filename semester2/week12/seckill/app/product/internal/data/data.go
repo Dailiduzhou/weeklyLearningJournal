@@ -27,7 +27,7 @@ type Data struct {
 	rs         *redsync.Redsync
 	q          *db.Queries
 	sg         *singleflight.Group
-	userclient *uv1.UserClient
+	userclient uv1.UserClient
 }
 
 // NewData .
@@ -62,6 +62,6 @@ func NewData(c *conf.Data, userclient uv1.UserClient) (*Data, func(), error) {
 		rs:         rs,
 		q:          db.New(sqldb),
 		sg:         &singleflight.Group{},
-		userclient: &userclient,
+		userclient: userclient,
 	}, cleanup, nil
 }

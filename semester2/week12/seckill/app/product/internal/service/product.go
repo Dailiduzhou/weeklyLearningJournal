@@ -17,5 +17,6 @@ func NewProductService(uc *biz.ProductUsecase) *ProductService {
 }
 
 func (s *ProductService) Seckill(ctx context.Context, req *pb.SeckillReq) (*pb.SeckillResp, error) {
+	err := s.uc.Seckill(ctx, req.UserID)
 	return &pb.SeckillResp{}, nil
 }
