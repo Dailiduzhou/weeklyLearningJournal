@@ -15,7 +15,7 @@ UPDATE products SET stock = stock - $2 WHERE id = $1 AND stock >= $2
 
 type DeductStockParams struct {
 	ID    int64
-	Stock interface{}
+	Stock int32
 }
 
 func (q *Queries) DeductStock(ctx context.Context, arg DeductStockParams) (int64, error) {

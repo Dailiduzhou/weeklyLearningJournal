@@ -6,6 +6,6 @@ package db
 
 type Product struct {
 	ID    int64
-	Price interface{}
-	Stock interface{}
+	Price int32
+	Stock int32
 }
