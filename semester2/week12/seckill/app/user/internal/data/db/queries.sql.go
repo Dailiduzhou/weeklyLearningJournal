@@ -10,23 +10,23 @@ import (
 )
 
 const creatUser = `-- name: CreatUser :one
-INSERT INTO users DEFAULT VALUES RETURNING id
+INSERT INTO users DEFAULT VALUES RETURNING id, balance
 `
 
-func (q *Queries) CreatUser(ctx context.Context) (int64, error) {
+func (q *Queries) CreatUser(ctx context.Context) (User, error) {
 	row := q.db.QueryRowContext(ctx, creatUser)
-	var id int64
-	err := row.Scan(&id)
-	return id, err
+	var i User
+	err := row.Scan(&i.ID, &i.Balance)
+	return i, err
 }
 
 const getUser = `-- name: GetUser :one
-SELECT id FROM users WHERE id = $1 LIMIT 1
+SELECT id, balance FROM users WHERE id = $1 LIMIT 1
 `
 
-func (q *Queries) GetUser(ctx context.Context, id int64) (int64, error) {
+func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 	row := q.db.QueryRowContext(ctx, getUser, id)
-	var id_2 int64
-	err := row.Scan(&id_2)
-	return id_2, err
+	var i User
+	err := row.Scan(&i.ID, &i.Balance)
+	return i, err
 }

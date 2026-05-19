@@ -21,6 +21,8 @@ service User {
         body: "*"
   };
   }
+
+  rpc DeductBalance (DeductBalanceRequest) returns (DeductBalanceReply) {}
 }
 
 message CreateUserRequest {}
@@ -33,5 +35,14 @@ message GetUserRequest {
 }
 message GetUserReply {
   int64 id = 1;
+}
+
+message DeductBalanceRequest {
+  int64 id = 1;
+  int64 amount = 2;
+}
+
+message DeductBalanceReply {
+  bool success = 1;
 }
 
