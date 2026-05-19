@@ -1,7 +1,7 @@
 package server
 
 import (
-	v1 "seckill/api/helloworld/v1"
+	v1 "seckill/api/user/v1"
 	"seckill/app/user/internal/conf"
 	"seckill/app/user/internal/service"
 
@@ -11,7 +11,7 @@ import (
 )
 
 // NewHTTPServer new an HTTP server.
-func NewHTTPServer(c *conf.Server, greeter *service.UserService, logger log.Logger) *http.Server {
+func NewHTTPServer(c *conf.Server, usersvc *service.UserService, logger log.Logger) *http.Server {
 	opts := []http.ServerOption{
 		http.Middleware(
 			recovery.Recovery(),
@@ -27,6 +27,6 @@ func NewHTTPServer(c *conf.Server, greeter *service.UserService, logger log.Logg
 		opts = append(opts, http.Timeout(c.Http.Timeout.AsDuration()))
 	}
 	srv := http.NewServer(opts...)
-	v1.RegisterGreeterHTTPServer(srv, greeter)
+	v1.RegisterUserHTTPServer(srv, usersvc)
 	return srv
 }

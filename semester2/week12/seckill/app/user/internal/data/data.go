@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"seckill/app/user/internal/biz"
 	"seckill/app/user/internal/conf"
 	"seckill/app/user/internal/data/db"
 
@@ -17,7 +18,7 @@ import (
 )
 
 // ProviderSet is data providers.
-var ProviderSet = wire.NewSet(NewData, NewUserRepo)
+var ProviderSet = wire.NewSet(NewData, NewUserRepo, wire.Bind(new(biz.UserRepo), new(*UserRepo)))
 
 // Data .
 type Data struct {
