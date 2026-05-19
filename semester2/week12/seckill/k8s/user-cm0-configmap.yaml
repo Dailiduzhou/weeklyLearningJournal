@@ -1,0 +1,27 @@
+apiVersion: v1
+data:
+  config.yaml: |
+    server:
+      http:
+        addr: 0.0.0.0:8000
+        timeout: 1s
+      grpc:
+        addr: 0.0.0.0:9000
+        timeout: 1s
+    data:
+      database:
+        driver: postgres
+        source: postgres:postgres@tcp(postgres:5432)/seckill?sslmode=disable
+      redis:
+        addr: redis:6379
+        read_timeout: 0.2s
+        write_timeout: 0.2s
+    registry:
+      etcd:
+        endpoints:
+          - "etcd:2379"
+kind: ConfigMap
+metadata:
+  labels:
+    io.kompose.service: user
+  name: user-cm0
