@@ -1,0 +1,5 @@
+CREATE TABLE products (
+  id BIGSERIAL PRIMARY KEY,
+  price int32 NOT NULL DEFAULT 1000,
+  stock int32 NOT NULL DEFAULT 5
+)
