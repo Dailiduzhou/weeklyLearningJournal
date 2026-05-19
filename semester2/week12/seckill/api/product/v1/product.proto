@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package api.product.v1;
+
+import "google/api/annotations.proto";
+option go_package = "seckill/api/product/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.product.v1";
+
+service Product {
+  rpc Seckill(SeckillReq) returns (SeckillResp) {
+    option (google.api.http) = {
+        get: "/api/seckill"
+        body: "*"
+    };
+  }
+}
+
+enum Result {
+  SUCCESS = 0;
+  FAILURE = 1;
+}
+
+message SeckillReq {}
+message SeckillResp {
+  Result res = 1;
+}

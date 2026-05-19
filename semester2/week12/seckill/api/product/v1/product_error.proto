@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package api.product.v1;
+import "errors/errors.proto";
+
+option go_package = "seckill/api/product/v1;v1";
+
+enum UserErrorReason {
+  option (errors.default_code) = 500;
+
+  SOLD_OUT = 0 [(errors.code) = 404];
+  SERVICE_BUSY = 1 [(errors.code) = 500];
+}
+

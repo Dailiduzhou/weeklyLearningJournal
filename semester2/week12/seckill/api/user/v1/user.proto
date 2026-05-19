@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package api.user.v1;
+
+import "google/api/annotations.proto";
+
+option go_package = "seckill/api/user/v1;v1";
+option java_multiple_files = true;
+option java_package = "api.user.v1";
+
+service User {
+	rpc Register (CreateUserRequest) returns (CreateUserReply) {
+    option (google.api.http) = {
+        post: "/api/register"
+        body: "*"
+    };
+  }
+	rpc GetUser (GetUserRequest) returns (GetUserReply) {
+    option (google.api.http) = {
+        post: "/api/user"
+        body: "*"
+  };
+  }
+}
+
+message CreateUserRequest {}
+message CreateUserReply {
+  int64 id = 1;
+}
+
+message GetUserRequest {
+  int64 id = 1;
+}
+message GetUserReply {
+  int64 id = 1;
+}
+
