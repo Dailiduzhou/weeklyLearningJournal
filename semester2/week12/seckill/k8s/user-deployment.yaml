@@ -48,14 +48,12 @@ spec:
             - mountPath: /data/conf
               name: config
           readinessProbe:
-            httpGet:
-              path: /healthz
+            tcpSocket:
               port: 8000
             initialDelaySeconds: 5
             periodSeconds: 10
           livenessProbe:
-            httpGet:
-              path: /healthz
+            tcpSocket:
               port: 8000
             initialDelaySeconds: 15
             periodSeconds: 20

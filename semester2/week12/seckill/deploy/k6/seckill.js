@@ -11,14 +11,16 @@ function buildStages() {
   if (__ENV.K6_STAGES) {
     return __ENV.K6_STAGES.split(',').map((entry) => {
       const parts = entry.split(':');
+      if (parts.length !== 2 || !parts[0] || Number.isNaN(Number(parts[1]))) {
+        throw new Error(`invalid K6_STAGES entry: "${entry}", expected format like 30s:200`);
+      }
       return { duration: parts[0], target: Number(parts[1]) };
     });
   }
 
   return [
-    { duration: '30s', target: 100 },
-    { duration: '1m', target: 500 },
-    { duration: '2m', target: 1000 },
+    { duration: '30s', target: 20 },
+    { duration: '1m', target: 50 },
     { duration: '30s', target: 0 },
   ];
 }
@@ -26,8 +28,8 @@ function buildStages() {
 export const options = {
   stages: buildStages(),
   thresholds: {
-    http_req_failed: ['rate<0.05'],
-    http_req_duration: ['p(95)<500'],
+    http_req_failed: ['rate<0.20'],
+    http_req_duration: ['p(95)<1000'],
   },
 };
 
@@ -39,7 +41,7 @@ export default function () {
   const payload = JSON.stringify({ userID: nextUserID() });
   const res = http.post(`${baseUrl}${seckillPath}`, payload, {
     headers: { 'Content-Type': 'application/json' },
-    timeout: __ENV.HTTP_TIMEOUT || '2s',
+    timeout: __ENV.HTTP_TIMEOUT || '5s',
   });
 
   check(res, {

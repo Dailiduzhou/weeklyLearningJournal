@@ -3,6 +3,8 @@ package data
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"time"
 
 	"seckill/app/user/internal/biz"
 	"seckill/app/user/internal/conf"
@@ -33,7 +35,14 @@ type Data struct {
 func NewData(c *conf.Data) (*Data, func(), error) {
 	sqldb, err := sql.Open("pgx", c.Database.Source)
 	if err != nil {
-		panic("error connecting db")
+		return nil, nil, fmt.Errorf("open postgres: %w", err)
+	}
+
+	pingCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := sqldb.PingContext(pingCtx); err != nil {
+		sqldb.Close()
+		return nil, nil, fmt.Errorf("ping postgres: %w", err)
 	}
 
 	rdb := redis.NewClient(&redis.Options{
@@ -43,7 +52,9 @@ func NewData(c *conf.Data) (*Data, func(), error) {
 	})
 
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
-		panic("error ping redis")
+		rdb.Close()
+		sqldb.Close()
+		return nil, nil, fmt.Errorf("ping redis: %w", err)
 	}
 
 	pool := goredis.NewPool(rdb)

@@ -3,6 +3,8 @@ package data
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"time"
 
 	uv1 "seckill/api/user/v1"
 	"seckill/app/product/internal/biz"
@@ -14,6 +16,7 @@ import (
 	"github.com/go-redsync/redsync/v4"
 	"github.com/go-redsync/redsync/v4/redis/goredis/v8"
 	"github.com/google/wire"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -34,7 +37,14 @@ type Data struct {
 func NewData(c *conf.Data, userclient uv1.UserClient) (*Data, func(), error) {
 	sqldb, err := sql.Open("pgx", c.Database.Source)
 	if err != nil {
-		panic("error connecting db")
+		return nil, nil, fmt.Errorf("open postgres: %w", err)
+	}
+
+	pingCtx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if err := sqldb.PingContext(pingCtx); err != nil {
+		sqldb.Close()
+		return nil, nil, fmt.Errorf("ping postgres: %w", err)
 	}
 
 	rdb := redis.NewClient(&redis.Options{
@@ -44,7 +54,9 @@ func NewData(c *conf.Data, userclient uv1.UserClient) (*Data, func(), error) {
 	})
 
 	if err := rdb.Ping(context.Background()).Err(); err != nil {
-		panic("error ping redis")
+		rdb.Close()
+		sqldb.Close()
+		return nil, nil, fmt.Errorf("ping redis: %w", err)
 	}
 
 	pool := goredis.NewPool(rdb)

@@ -4,14 +4,14 @@ data:
     server:
       http:
         addr: 0.0.0.0:8000
-        timeout: 1s
+        timeout: 3s
       grpc:
         addr: 0.0.0.0:9000
-        timeout: 1s
+        timeout: 3s
     data:
       database:
         driver: postgres
-        source: postgres:postgres@tcp(postgres:5432)/seckill?sslmode=disable
+        source: postgres://postgres:postgres@postgres:5432/seckill?sslmode=disable
       redis:
         addr: redis:6379
         read_timeout: 0.2s
