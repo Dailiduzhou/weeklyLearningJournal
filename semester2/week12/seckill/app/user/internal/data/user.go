@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/go-redis/redis/v8"
 	"github.com/go-redsync/redsync/v4"
 )
 
@@ -40,7 +42,9 @@ func (r *UserRepo) FindByID(ctx context.Context, ID int64) (*biz.User, error) {
 	if err == nil {
 		return user, nil
 	}
-	log.Errorf("Error get cache:%v", err)
+	if !stderrors.Is(err, redis.Nil) {
+		log.Errorf("Error get user cache: %v", err)
+	}
 
 	sfKey := fmt.Sprintf("sf:user:%d", ID)
 	val, err, _ := r.data.sg.Do(sfKey, func() (interface{}, error) {
@@ -110,7 +114,14 @@ func (r *UserRepo) DeducBalance(ctx context.Context, ID int64, amount int32) err
 		return errors.InternalServer("DB_ERROR", "failed to deduct balance")
 	}
 	if n == 0 {
-		return userv1.ErrorLowBalance("user %d not found or insufficient balance", ID)
+		_, err := r.data.q.GetUser(ctx, ID)
+		if err != nil {
+			if err == sql.ErrNoRows {
+				return userv1.ErrorUserNotFound("user %d not found", ID)
+			}
+			return errors.InternalServer("DB_ERROR", "failed to fetch user after deduct balance miss")
+		}
+		return userv1.ErrorLowBalance("user %d has insufficient balance", ID)
 	}
 
 	cacheKey := fmt.Sprintf("user:%d", ID)

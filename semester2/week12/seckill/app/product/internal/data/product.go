@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	stderrors "errors"
 	"fmt"
 	"math/rand"
 	"time"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/go-kratos/kratos/v2/errors"
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/go-redis/redis/v8"
 	"github.com/go-redsync/redsync/v4"
 )
 
@@ -33,7 +35,9 @@ func (r *ProductRepo) FindByID(ctx context.Context, ID int64) (*biz.Product, err
 	if err == nil {
 		return product, nil
 	}
-	log.Errorf("Error get cache:%v", err)
+	if !stderrors.Is(err, redis.Nil) {
+		log.Errorf("Error get product cache: %v", err)
+	}
 
 	sfKey := fmt.Sprintf("sf:product:%d", ID)
 	val, err, _ := r.data.sg.Do(sfKey, func() (interface{}, error) {
@@ -51,13 +55,13 @@ func (r *ProductRepo) FindByID(ctx context.Context, ID int64) (*biz.Product, err
 			return productDoublecheck, nil
 		}
 
-		log.Infof("User %d fetching from DB", ID)
+		log.Infof("Product %d fetching from DB", ID)
 		dbProduct, err := r.data.q.GetProduct(ctx, ID)
 		if err != nil {
 			if err == sql.ErrNoRows {
 				return nil, errors.InternalServer("DB_ERROR", "no product")
 			}
-			return nil, errors.InternalServer("DB_ERROR", "failed to fetch user")
+			return nil, errors.InternalServer("DB_ERROR", "failed to fetch product")
 		}
 		finalProduct := &biz.Product{
 			ID:    dbProduct.ID,
@@ -76,17 +80,6 @@ func (r *ProductRepo) FindByID(ctx context.Context, ID int64) (*biz.Product, err
 }
 
 func (r *ProductRepo) DeductStock(ctx context.Context, userID int64, ID int64, amount int32) error {
-	_, err := r.data.userclient.GetUser(ctx, &uv1.GetUserRequest{
-		Id: userID,
-	})
-	if err != nil {
-		if uv1.IsUserNotFound(err) {
-			log.Errorf("User %d nod found", userID)
-			return productv1.ErrorServiceBusy("User %d not found", userID)
-		}
-		return errors.InternalServer("USER_SERVICE_ERROR", "can't get user")
-	}
-
 	product, err := r.FindByID(ctx, ID)
 	if err != nil {
 		log.Errorf("DB_ERROR: %q", err)
@@ -100,6 +93,10 @@ func (r *ProductRepo) DeductStock(ctx context.Context, userID int64, ID int64, a
 
 	_, err = r.data.userclient.DeductBalance(ctx, &uv1.DeductBalanceRequest{Id: userID, Amount: int64(product.Price)})
 	if err != nil {
+		if uv1.IsUserNotFound(err) {
+			log.Errorf("User %d not found", userID)
+			return productv1.ErrorServiceBusy("User %d not found", userID)
+		}
 		if uv1.IsLowBalance(err) {
 			log.Errorf("User %d has insufficient balance", userID)
 		}
