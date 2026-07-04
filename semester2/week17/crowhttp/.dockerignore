@@ -1,0 +1,9 @@
+.git
+.gitignore
+build/
+.xmake/
+.cache/
+*.md
+Dockerfile
+docker-compose.yml
+.dockerignore
