@@ -1,0 +1,14 @@
+{
+  "name": "drogon-s3-demo",
+  "version": "1.0.0",
+  "dependencies": [
+    "drogon",
+    {
+      "name": "aws-sdk-cpp",
+      "default-features": false,
+      "features": [
+        "s3"
+      ]
+    }
+  ]
+}
