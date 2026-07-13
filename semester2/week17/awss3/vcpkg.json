@@ -1,6 +1,7 @@
 {
   "name": "drogon-s3-demo",
   "version": "1.0.0",
+  "description": "Drogon HTTP service backed by AWS S3 (or any S3-compatible store such as minIO)",
   "dependencies": [
     "drogon",
     {
@@ -9,6 +10,7 @@
       "features": [
         "s3"
       ]
-    }
+    },
+    "gtest"
   ]
 }

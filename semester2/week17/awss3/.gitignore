@@ -559,3 +559,19 @@ FodyWeavers.xsd
 *.tlog
 
 # End of https://www.toptal.com/developers/gitignore/api/intellij+all,visualstudio,visualstudiocode,cmake,c,c++
+
+# ##############################################################################
+# Project-specific: build, vcpkg artifacts, docker
+# ##############################################################################
+build/
+build-*/
+
+# vcpkg build/install artifacts (the source-tree ports/ + scripts/ stay in vcs)
+vcpkg/downloads/
+vcpkg/buildtrees/
+vcpkg/packages/
+vcpkg/.vcpkg-*/
+
+# Compose / docker runtime data
+.docker-data/
+minio-data/

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.16)
 project(awss3 CXX)
 
 include(CheckIncludeFileCXX)
@@ -19,28 +19,17 @@ endif ()
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(${PROJECT_NAME} main.cc)
-
 # ##############################################################################
-# If you include the drogon source code locally in your project, use this method
-# to add drogon 
-# add_subdirectory(drogon) 
-# target_link_libraries(${PROJECT_NAME} PRIVATE drogon)
-#
-# and comment out the following lines
+# vcpkg toolchain is wired in by the bootstrap helper (see scripts/build.sh) or
+# by passing -DCMAKE_TOOLCHAIN_FILE=... to cmake. We just locate the packages.
+# ##############################################################################
 find_package(Drogon CONFIG REQUIRED)
-find_package(AWSSDK REQUIRED COMPONENTS s3)
-target_link_libraries(${PROJECT_NAME} PRIVATE Drogon::Drogon AWSSDK::s3)
+find_package(AWSSDK CONFIG REQUIRED COMPONENTS s3)
 
 # ##############################################################################
-
-if (CMAKE_CXX_STANDARD LESS 17)
-    message(FATAL_ERROR "c++17 or higher is required")
-elseif (CMAKE_CXX_STANDARD LESS 20)
-    message(STATUS "use c++17")
-else ()
-    message(STATUS "use c++20")
-endif ()
+# Source layout
+# ##############################################################################
+add_executable(${PROJECT_NAME} main.cc)
 
 aux_source_directory(controllers CTL_SRC)
 aux_source_directory(filters FILTER_SRC)
@@ -49,28 +38,37 @@ aux_source_directory(models MODEL_SRC)
 
 drogon_create_views(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/views
                     ${CMAKE_CURRENT_BINARY_DIR})
-# use the following line to create views with namespaces.
-# drogon_create_views(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/views
-#                     ${CMAKE_CURRENT_BINARY_DIR} TRUE)
-# use the following line to create views with namespace CHANGE_ME prefixed
-# and path namespaces.
-# drogon_create_views(${PROJECT_NAME} ${CMAKE_CURRENT_SOURCE_DIR}/views
-#                     ${CMAKE_CURRENT_BINARY_DIR} TRUE CHANGE_ME)
 
 target_include_directories(${PROJECT_NAME}
                            PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
                                    ${CMAKE_CURRENT_SOURCE_DIR}/models)
 target_sources(${PROJECT_NAME}
                PRIVATE
-               ${SRC_DIR}
                ${CTL_SRC}
                ${FILTER_SRC}
                ${PLUGIN_SRC}
                ${MODEL_SRC})
-# ##############################################################################
-# uncomment the following line for dynamically loading views 
-# set_property(TARGET ${PROJECT_NAME} PROPERTY ENABLE_EXPORTS ON)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE
+                      Drogon::Drogon
+                      aws-cpp-sdk-s3)
 
 # ##############################################################################
+# Standard / spec diagnostics
+# ##############################################################################
+if (CMAKE_CXX_STANDARD LESS 17)
+    message(FATAL_ERROR "c++17 or higher is required")
+elseif (CMAKE_CXX_STANDARD LESS 20)
+    message(STATUS "use c++17")
+else ()
+    message(STATUS "use c++20")
+endif ()
 
-add_subdirectory(test)
+# ##############################################################################
+# Tests
+# ##############################################################################
+option(AWSS3_BUILD_TESTS "Build awss3 unit tests" ON)
+if (AWSS3_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(test)
+endif ()

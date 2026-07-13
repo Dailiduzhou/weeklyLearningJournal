@@ -1,0 +1,25 @@
+.git
+.gitignore
+.idea
+.vscode
+
+# Build outputs
+build/
+build-/
+
+# vcpkg local cache (will be re-fetched inside the image)
+vcpkg/downloads/
+vcpkg/buildtrees/
+vcpkg/packages/
+vcpkg/.vcpkg-*/
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+
+# Local runtime data
+minio-data/
+.docker-data/
+*.log

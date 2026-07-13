@@ -1,0 +1,69 @@
+name: drogon-s3-demo
+
+services:
+  #############################################################################
+  # Local S3-compatible object store for development & tests.
+  #############################################################################
+  minio:
+    image: minio/minio:latest
+    container_name: awss3-minio
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # web console
+    volumes:
+      - minio-data:/data
+
+  #############################################################################
+  # One-shot init: creates the bucket and relaxes ACL for smoke tests.
+  #############################################################################
+  minio-init:
+    image: minio/mc:latest
+    container_name: awss3-minio-init
+    depends_on:
+      minio:
+        condition: service_started
+    environment:
+      S3_ENDPOINT: "http://minio:9000"
+      S3_BUCKET: "test-bucket"
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - ./minio/init.sh:/init.sh:ro
+    entrypoint: ["/bin/sh", "/init.sh"]
+    restart: "no"
+
+  #############################################################################
+  # The Drogon HTTP service.
+  #############################################################################
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: drogon-s3-demo:local
+    container_name: awss3-app
+    depends_on:
+      minio-init:
+        condition: service_completed_successfully
+    environment:
+      HTTP_HOST: 0.0.0.0
+      HTTP_PORT: 8080
+      AWS_REGION: us-east-1
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      S3_ENDPOINT: "http://minio:9000"
+      S3_BUCKET: "test-bucket"
+      S3_PATH_STYLE: "1"
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+volumes:
+  minio-data:

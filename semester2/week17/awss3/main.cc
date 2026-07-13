@@ -1,37 +1,58 @@
 #include <aws/core/Aws.h>
-#include <aws/s3/S3Client.h>
 #include <drogon/drogon.h>
+
+#include <cstdlib>
+#include <string>
+#include <stdexcept>
 
 using namespace drogon;
 
+namespace {
+
+std::string envOr(const char *name, const std::string &fallback) {
+  if (auto p = std::getenv(name)) return p;
+  return fallback;
+}
+
+int envInt(const char *name, int fallback) {
+  if (auto p = std::getenv(name)) {
+    try { return std::stoi(p); } catch (...) {}
+  }
+  return fallback;
+}
+
+}  // namespace
+
 int main() {
-  // 1. 初始化 AWS SDK
   Aws::SDKOptions options;
-  // 如果需要可以配置日志等选项：options.loggingOptions.logLevel =
-  // Aws::Utils::Logging::LogLevel::Info;
   Aws::InitAPI(options);
 
-  // 2. 注册一个简单的 Drogon 路由来测试 S3 Client
+  const std::string host = envOr("HTTP_HOST", "0.0.0.0");
+  const int port = envInt("HTTP_PORT", 8080);
+
+  LOG_INFO << "Starting drogon-s3-demo on " << host << ":" << port;
+
   app().registerHandler(
-      "/s3-test", [](const HttpRequestPtr &req,
-                     std::function<void(const HttpResponsePtr &)> &&callback) {
-        // 实例化 S3 Client
-        Aws::Client::ClientConfiguration clientConfig;
-        clientConfig.region = "us-east-1"; // 设置你的目标区域
-
-        Aws::S3::S3Client s3_client(clientConfig);
-
-        auto resp = HttpResponse::newHttpResponse();
-        resp->setBody("AWS S3 Client Initialized in Drogon!");
-        callback(resp);
+      "/health",
+      [](const HttpRequestPtr &,
+         std::function<void(const HttpResponsePtr &)> &&cb) {
+        auto r = HttpResponse::newHttpResponse();
+        r->setBody("ok");
+        cb(r);
       });
 
-  // 3. 启动 Drogon HTTP 服务器 (这会阻塞当前线程直到服务器关闭)
-  LOG_INFO << "Server running on 127.0.0.1:8080";
-  app().addListener("127.0.0.1", 8080).run();
+  // Configure AWS S3 (minIO / AWS) via env vars, used by S3Controller.
+  //   S3_ENDPOINT            e.g. http://minio:9000  (empty => real AWS)
+  //   AWS_REGION             e.g. us-east-1
+  //   AWS_ACCESS_KEY_ID      e.g. minioadmin
+  //   AWS_SECRET_ACCESS_KEY  e.g. minioadmin
+  //   S3_BUCKET              e.g. test-bucket
+  //   S3_PATH_STYLE          "1" (default) or "0"
+  //   HTTP_HOST / HTTP_PORT  bind address
+  setenv("AWS_REGION", envOr("AWS_REGION", "us-east-1").c_str(), 0);
 
-  // 4. Drogon 关闭后，清理 AWS SDK 资源
+  app().addListener(host, port).run();
+
   Aws::ShutdownAPI(options);
-
   return 0;
 }
