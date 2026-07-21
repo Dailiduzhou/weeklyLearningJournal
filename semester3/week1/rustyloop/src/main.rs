@@ -1,13 +1,12 @@
 use std::env;
-use std::error::Error;
-use std::fmt;
 use std::future::Future;
 use std::io::{self, BufRead, Write};
 
 use openai_oxide::types::chat::{ChatCompletionMessageParam, ChatCompletionRequest, UserContent};
-use openai_oxide::{ClientConfig, OpenAI};
+use openai_oxide::{ClientConfig, OpenAI, OpenAIError};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use thiserror::Error;
 
 const MAX_RETRIES: u32 = 3;
 const MODEL: &str = "deepseek-v4-flash";
@@ -21,47 +20,18 @@ struct Response {
     tags: Vec<String>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Error)]
 enum AppError {
+    #[error("model output does not match Response")]
     InvalidResponse,
-    Config(&'static str),
-    Request(String),
-    Io(io::Error),
-    Json(serde_json::Error),
-}
-
-impl fmt::Display for AppError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::InvalidResponse => formatter.write_str("model output does not match Response"),
-            Self::Config(message) => formatter.write_str(message),
-            Self::Request(message) => formatter.write_str(message),
-            Self::Io(error) => write!(formatter, "{error}"),
-            Self::Json(error) => write!(formatter, "{error}"),
-        }
-    }
-}
-
-impl Error for AppError {
-    fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            Self::Io(error) => Some(error),
-            Self::Json(error) => Some(error),
-            _ => None,
-        }
-    }
-}
-
-impl From<io::Error> for AppError {
-    fn from(error: io::Error) -> Self {
-        Self::Io(error)
-    }
-}
-
-impl From<serde_json::Error> for AppError {
-    fn from(error: serde_json::Error) -> Self {
-        Self::Json(error)
-    }
+    #[error("OPENAI_API_KEY is required")]
+    MissingApiKey,
+    #[error("create chat completion: {0}")]
+    Request(#[source] OpenAIError),
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
 }
 
 #[tokio::main]
@@ -156,7 +126,7 @@ async fn create_response(client: &OpenAI, user_prompt: String) -> Result<Respons
         .completions()
         .create(request)
         .await
-        .map_err(|error| AppError::Request(format!("create chat completion: {error}")))?;
+        .map_err(AppError::Request)?;
 
     let Some(message) = completion.choices.first().map(|choice| &choice.message) else {
         return Err(AppError::InvalidResponse);
@@ -186,7 +156,7 @@ fn client_config_with(
     let api_key = get_env("OPENAI_API_KEY")
         .filter(|value| !value.is_empty())
         .or_else(|| get_env("OPENAI_APIKEY").filter(|value| !value.is_empty()))
-        .ok_or(AppError::Config("OPENAI_API_KEY is required"))?;
+        .ok_or(AppError::MissingApiKey)?;
 
     let mut config = ClientConfig::new(api_key).max_retries(MAX_RETRIES);
     if let Some(base_url) = get_env("OPENAI_BASEURL")
@@ -318,7 +288,9 @@ mod tests {
             prompts.push(prompt.clone());
             std::future::ready(match prompt.as_str() {
                 "invalid response" => Err(AppError::InvalidResponse),
-                "request error" => Err(AppError::Request("request failed".to_owned())),
+                "request error" => Err(AppError::Request(OpenAIError::InvalidArgument(
+                    "request failed".to_owned(),
+                ))),
                 _ => Ok(response(&format!("response for {prompt}"))),
             })
         })

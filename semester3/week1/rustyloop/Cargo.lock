@@ -1061,6 +1061,7 @@ dependencies = [
  "openai-oxide",
  "serde",
  "serde_json",
+ "thiserror",
  "tokio",
 ]
 
