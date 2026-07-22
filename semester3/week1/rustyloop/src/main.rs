@@ -1,6 +1,7 @@
 use std::env;
 use std::future::Future;
 use std::io::{self, BufRead, Write};
+use std::process::ExitCode;
 
 use openai_oxide::types::chat::{ChatCompletionMessageParam, ChatCompletionRequest, UserContent};
 use openai_oxide::{ClientConfig, OpenAI, OpenAIError};
@@ -35,23 +36,23 @@ enum AppError {
 }
 
 #[tokio::main]
-async fn main() {
+async fn main() -> ExitCode {
     if let Err(error) = run().await {
         eprintln!("{error}");
-        std::process::exit(1);
+        return ExitCode::FAILURE;
     }
+    ExitCode::SUCCESS
 }
 
 async fn run() -> Result<(), AppError> {
     let client = OpenAI::with_config(client_config()?);
-    let response_client = client.clone();
 
     interactive_loop(
         io::stdin().lock(),
         io::stdout().lock(),
         io::stderr().lock(),
         move |prompt| {
-            let client = response_client.clone();
+            let client = client.clone();
             async move { create_response(&client, prompt).await }
         },
     )
@@ -74,10 +75,12 @@ where
     let mut line = String::new();
 
     loop {
-        let _ = write!(diagnostics, "> ");
+        write!(diagnostics, "> ")?;
+        diagnostics.flush()?;
+
         line.clear();
         if input.read_line(&mut line)? == 0 {
-            return Ok(());
+            break;
         }
 
         let prompt = line.trim();
@@ -85,28 +88,33 @@ where
             continue;
         }
         if prompt.eq_ignore_ascii_case("quit") || prompt.eq_ignore_ascii_case("exit") {
-            return Ok(());
+            break;
         }
 
         match handle(prompt.to_owned()).await {
             Ok(response) => {
                 if let Err(error) = write_response(&mut output, &response) {
-                    let _ = writeln!(diagnostics, "{error}");
+                    writeln!(diagnostics, "{error}")?;
                 }
             }
-            Err(AppError::InvalidResponse) => {}
+            Err(AppError::InvalidResponse) => {} // 忽略解析失败，继续循环
             Err(error) => {
-                let _ = writeln!(diagnostics, "{error}");
+                writeln!(diagnostics, "{error}")?;
             }
         }
     }
+
+    Ok(())
 }
 
 async fn create_response(client: &OpenAI, user_prompt: String) -> Result<Response, AppError> {
-    let schema = response_schema();
     let system_prompt = format!(
-        "Return only one JSON object that exactly matches the following JSON Schema. Do not use Markdown or add explanatory text.\nJSON Schema:\n{schema}"
+        "Return only one JSON object that exactly matches the following JSON Schema. \
+         Do not use Markdown or add explanatory text.\n\
+         JSON Schema:\n{}",
+        response_schema()
     );
+
     let request = ChatCompletionRequest::new(
         MODEL,
         vec![
@@ -128,16 +136,16 @@ async fn create_response(client: &OpenAI, user_prompt: String) -> Result<Respons
         .await
         .map_err(AppError::Request)?;
 
-    let Some(message) = completion.choices.first().map(|choice| &choice.message) else {
-        return Err(AppError::InvalidResponse);
-    };
-    if message
-        .refusal
-        .as_deref()
-        .is_some_and(|refusal| !refusal.is_empty())
-    {
+    let message = completion
+        .choices
+        .first()
+        .map(|choice| &choice.message)
+        .ok_or(AppError::InvalidResponse)?;
+
+    if message.refusal.as_deref().is_some_and(|r| !r.is_empty()) {
         return Err(AppError::InvalidResponse);
     }
+
     let content = message
         .content
         .as_deref()
@@ -153,18 +161,21 @@ fn client_config() -> Result<ClientConfig, AppError> {
 fn client_config_with(
     mut get_env: impl FnMut(&str) -> Option<String>,
 ) -> Result<ClientConfig, AppError> {
-    let api_key = get_env("OPENAI_API_KEY")
-        .filter(|value| !value.is_empty())
-        .or_else(|| get_env("OPENAI_APIKEY").filter(|value| !value.is_empty()))
+    let api_key = ["OPENAI_API_KEY", "OPENAI_APIKEY"]
+        .into_iter()
+        .find_map(|key| get_env(key).filter(|value| !value.is_empty()))
         .ok_or(AppError::MissingApiKey)?;
 
     let mut config = ClientConfig::new(api_key).max_retries(MAX_RETRIES);
-    if let Some(base_url) = get_env("OPENAI_BASEURL")
-        .filter(|value| !value.is_empty())
-        .or_else(|| get_env("OPENAI_BASE_URL").filter(|value| !value.is_empty()))
+
+    // Legacy BASEURL 具有更高优先级
+    if let Some(base_url) = ["OPENAI_BASEURL", "OPENAI_BASE_URL"]
+        .into_iter()
+        .find_map(|key| get_env(key).filter(|value| !value.is_empty()))
     {
         config = config.base_url(base_url.trim_end_matches('/'));
     }
+
     Ok(config)
 }
 
@@ -172,12 +183,12 @@ fn response_schema() -> Value {
     json!({
         "type": "object",
         "properties": {
-            "title": {"type": "string"},
-            "summary": {"type": "string"},
-            "priority": {"type": "string"},
+            "title": { "type": "string" },
+            "summary": { "type": "string" },
+            "priority": { "type": "string" },
             "tags": {
                 "type": "array",
-                "items": {"type": "string"}
+                "items": { "type": "string" }
             }
         },
         "required": ["title", "summary", "priority", "tags"],
@@ -218,9 +229,12 @@ mod tests {
     async fn create_response_uses_chat_completions() {
         let mut server = mockito::Server::new_async().await;
         let system_prompt = format!(
-            "Return only one JSON object that exactly matches the following JSON Schema. Do not use Markdown or add explanatory text.\nJSON Schema:\n{}",
+            "Return only one JSON object that exactly matches the following JSON Schema. \
+             Do not use Markdown or add explanatory text.\n\
+             JSON Schema:\n{}",
             response_schema()
         );
+
         let endpoint = server
             .mock("POST", "/chat/completions")
             .match_header("authorization", "Bearer test-key")
