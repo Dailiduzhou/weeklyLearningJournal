@@ -10,11 +10,16 @@ import (
 	"os"
 	"strings"
 
+	"github.com/joho/godotenv"
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
 )
 
-const maxRetries = 3
+const (
+	maxRetries       = 3
+	openAIAPIKeyEnv  = "OPENAI_API_KEY"
+	openAIBaseURLEnv = "OPENAI_BASE_URL"
+)
 
 var errInvalidResponse = errors.New("model output does not match Response")
 
@@ -41,6 +46,11 @@ var responseSchema = map[string]any{
 }
 
 func main() {
+	if err := loadEnv(); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 	options, err := clientOptions()
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -61,6 +71,13 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func loadEnv() error {
+	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("load .env: %w", err)
+	}
+	return nil
 }
 
 type promptHandler func(context.Context, string, io.Writer) error
@@ -145,12 +162,9 @@ func createResponse(ctx context.Context, client *openai.Client, userPrompt strin
 }
 
 func clientOptions() ([]option.RequestOption, error) {
-	apiKey := os.Getenv("OPENAI_API_KEY")
+	apiKey := os.Getenv(openAIAPIKeyEnv)
 	if apiKey == "" {
-		apiKey = os.Getenv("OPENAI_APIKEY")
-	}
-	if apiKey == "" {
-		return nil, errors.New("OPENAI_API_KEY is required")
+		return nil, fmt.Errorf("%s is required", openAIAPIKeyEnv)
 	}
 
 	options := []option.RequestOption{
@@ -158,9 +172,7 @@ func clientOptions() ([]option.RequestOption, error) {
 		option.WithMaxRetries(maxRetries),
 	}
 
-	// Keep compatibility with the original environment variable while also letting
-	// the SDK read its standard OPENAI_BASE_URL variable itself.
-	if baseURL := os.Getenv("OPENAI_BASEURL"); baseURL != "" {
+	if baseURL := os.Getenv(openAIBaseURLEnv); baseURL != "" {
 		options = append(options, option.WithBaseURL(baseURL))
 	}
 

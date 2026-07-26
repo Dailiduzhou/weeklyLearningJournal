@@ -2,7 +2,10 @@ module llmloop
 
 go 1.26.5
 
-require github.com/openai/openai-go/v3 v3.44.0
+require (
+	github.com/joho/godotenv v1.5.1
+	github.com/openai/openai-go/v3 v3.44.0
+)
 
 require (
 	github.com/tidwall/gjson v1.18.0 // indirect
