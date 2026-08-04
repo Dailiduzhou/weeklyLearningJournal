@@ -5,223 +5,128 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
+	"os/signal"
 	"strings"
-	"time"
+	"syscall"
 
-	"github.com/joho/godotenv"
-	"github.com/openai/openai-go/v3"
-	"github.com/openai/openai-go/v3/option"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"toolcall/internal/agent"
+	"toolcall/internal/audit"
+	"toolcall/internal/config"
+	"toolcall/internal/llm/openaiadapter"
+	"toolcall/internal/tool"
+	"toolcall/internal/tools/calculator"
+	"toolcall/internal/tools/docsearch"
+	postgresTool "toolcall/internal/tools/postgres"
 )
-
-const (
-	maxRetries       = 3
-	openAIAPIKeyEnv  = "OPENAI_API_KEY"
-	openAIBaseURLEnv = "OPENAI_BASE_URL"
-)
-
-var errInvalidResponse = errors.New("model output does not match Response")
-
-type Config struct {
-	MaxRetries      int64         `mapstructure:"maxretries"`
-	MaxLoops        int64         `mapstructure:"maxloops"`
-	ToolCallTimeout time.Duration `mapstructure:"toolcalltimeout"`
-}
-
-type Response struct {
-	Title    string   `json:"title"`
-	Summary  string   `json:"summary"`
-	Priority string   `json:"priority"`
-	Tags     []string `json:"tags"`
-}
-
-var responseSchema = map[string]any{
-	"type": "object",
-	"properties": map[string]any{
-		"title":    map[string]any{"type": "string"},
-		"summary":  map[string]any{"type": "string"},
-		"priority": map[string]any{"type": "string"},
-		"tags": map[string]any{
-			"type":  "array",
-			"items": map[string]any{"type": "string"},
-		},
-	},
-	"required":             []string{"title", "summary", "priority", "tags"},
-	"additionalProperties": false,
-}
 
 func main() {
-	if err := loadEnv(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-
-	options, err := clientOptions()
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		os.Exit(1)
-	}
-
-	client := openai.NewClient(options...)
-	err = interactiveLoop(
-		context.Background(),
-		os.Stdin,
-		os.Stdout,
-		os.Stderr,
-		func(ctx context.Context, prompt string, output io.Writer) error {
-			return createResponse(ctx, &client, prompt, output)
-		},
-	)
-	if err != nil {
+	if err := run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
 }
 
-func loadEnv() error {
-	if err := godotenv.Load(); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("load .env: %w", err)
+func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("agent-runtime", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	configPath := flags.String("config", "", "path to YAML configuration")
+	if err := flags.Parse(args); err != nil {
+		if errors.Is(err, flag.ErrHelp) {
+			return nil
+		}
+		return err
 	}
-	return nil
+	cfg, err := config.Load(*configPath)
+	if err != nil {
+		return err
+	}
+	level := slog.LevelInfo
+	if strings.EqualFold(cfg.Audit.Level, "debug") {
+		level = slog.LevelDebug
+	}
+	logger := slog.New(slog.NewJSONHandler(stderr, &slog.HandlerOptions{Level: level}))
+
+	rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	docs, err := docsearch.New(cfg.Documents.Directory, cfg.Documents.ChunkRunes, cfg.Documents.MaxResults)
+	if err != nil {
+		return err
+	}
+
+	var pool *pgxpool.Pool
+	if cfg.Database.Enabled {
+		pool, err = pgxpool.New(rootCtx, cfg.Database.DSN)
+		if err != nil {
+			return fmt.Errorf("create database pool: %w", err)
+		}
+		defer pool.Close()
+		if err := pool.Ping(rootCtx); err != nil {
+			return fmt.Errorf("connect database: %w", err)
+		}
+	}
+	queries := make([]postgresTool.QueryDefinition, 0, len(cfg.Database.Queries))
+	for _, q := range cfg.Database.Queries {
+		params := make([]postgresTool.ParamDefinition, 0, len(q.Params))
+		for _, p := range q.Params {
+			params = append(params, postgresTool.ParamDefinition{
+				Name: p.Name, Type: p.Type, Required: p.Required, MaxLength: p.MaxLength,
+				Minimum: p.Minimum, Maximum: p.Maximum,
+			})
+		}
+		queries = append(queries, postgresTool.QueryDefinition{Name: q.Name, Description: q.Description, SQL: q.SQL, Params: params})
+	}
+	dbTool := postgresTool.New(pool, queries, cfg.Database.QueryTimeout, cfg.Database.MaxRows, cfg.Database.MaxBytes)
+	registry, err := tool.NewRegistry(calculator.New(), docs, dbTool)
+	if err != nil {
+		return err
+	}
+	model := openaiadapter.New(cfg.Model.APIKey, cfg.Model.BaseURL, cfg.Model.Name)
+	runtime, err := agent.New(agent.Config{
+		MaxRounds: cfg.Agent.MaxRounds, TaskTimeout: cfg.Agent.TaskTimeout,
+		ModelTimeout: cfg.Model.Timeout, ToolTimeout: cfg.Agent.ToolTimeout,
+		MaxToolResultBytes: cfg.Agent.MaxToolResultBytes, MaxHistoryBytes: cfg.Agent.MaxHistoryBytes,
+		MaxRepeatedFailures: cfg.Agent.MaxRepeatedFailures, MaxUnknownTools: cfg.Agent.MaxUnknownTools,
+		ModelRetries: cfg.Model.MaxRetries,
+	}, model, registry, audit.NewSlog(logger))
+	if err != nil {
+		return err
+	}
+
+	encoder := json.NewEncoder(stdout)
+	encoder.SetIndent("", "  ")
+	if prompt := strings.TrimSpace(strings.Join(flags.Args(), " ")); prompt != "" {
+		return encoder.Encode(runtime.Run(rootCtx, prompt))
+	}
+	return interactive(rootCtx, stdin, stderr, encoder, runtime)
 }
 
-func loadConfig()
-
-type promptHandler func(context.Context, string, io.Writer) error
-
-func interactiveLoop(
-	ctx context.Context,
-	input io.Reader,
-	output io.Writer,
-	diagnostics io.Writer,
-	handle promptHandler,
-) error {
+func interactive(ctx context.Context, input io.Reader, diagnostics io.Writer, encoder *json.Encoder, runtime *agent.Runtime) error {
 	scanner := bufio.NewScanner(input)
 	scanner.Buffer(make([]byte, 1024), 1024*1024)
-
 	for {
 		fmt.Fprint(diagnostics, "> ")
 		if !scanner.Scan() {
 			return scanner.Err()
 		}
-
 		prompt := strings.TrimSpace(scanner.Text())
 		if prompt == "" {
 			continue
 		}
-		if strings.EqualFold(prompt, "quit") || strings.EqualFold(prompt, "exit") {
+		if strings.EqualFold(prompt, "exit") || strings.EqualFold(prompt, "quit") {
 			return nil
 		}
-
-		if err := handle(ctx, prompt, output); err != nil {
-			// Invalid model output must not be emitted, but it should not end the loop.
-			if errors.Is(err, errInvalidResponse) {
-				continue
-			}
-			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-				return err
-			}
-			fmt.Fprintln(diagnostics, err)
+		if err := encoder.Encode(runtime.Run(ctx, prompt)); err != nil {
+			return err
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
 	}
-}
-
-func createResponse(ctx context.Context, client *openai.Client, userPrompt string, output io.Writer) error {
-	schemaJSON, err := json.Marshal(responseSchema)
-	if err != nil {
-		return fmt.Errorf("marshal response schema: %w", err)
-	}
-	systemPrompt := "Return only one JSON object that exactly matches the following JSON Schema. Do not use Markdown or add explanatory text.\nJSON Schema:\n" + string(schemaJSON)
-
-	completion, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: "deepseek-v4-flash",
-		Messages: []openai.ChatCompletionMessageParamUnion{
-			openai.SystemMessage(systemPrompt),
-			openai.UserMessage(userPrompt),
-		},
-		// Temporarily disabled: enforce the schema through response_format.
-		// ResponseFormat: openai.ChatCompletionNewParamsResponseFormatUnion{
-		// 	OfJSONSchema: &openai.ResponseFormatJSONSchemaParam{
-		// 		JSONSchema: openai.ResponseFormatJSONSchemaJSONSchemaParam{
-		// 			Name:   "response",
-		// 			Schema: responseSchema,
-		// 			Strict: openai.Bool(true),
-		// 		},
-		// 	},
-		// },
-	})
-	if err != nil {
-		return fmt.Errorf("create chat completion: %w", err)
-	}
-	if len(completion.Choices) == 0 || completion.Choices[0].Message.Refusal != "" {
-		return errInvalidResponse
-	}
-
-	result, ok := decodeResponse(completion.Choices[0].Message.Content)
-	if !ok {
-		return errInvalidResponse
-	}
-
-	if err := json.NewEncoder(output).Encode(result); err != nil {
-		return fmt.Errorf("write response: %w", err)
-	}
-	return nil
-}
-
-func clientOptions() ([]option.RequestOption, error) {
-	apiKey := os.Getenv(openAIAPIKeyEnv)
-	if apiKey == "" {
-		return nil, fmt.Errorf("%s is required", openAIAPIKeyEnv)
-	}
-
-	options := []option.RequestOption{
-		option.WithAPIKey(apiKey),
-		option.WithMaxRetries(maxRetries),
-	}
-
-	if baseURL := os.Getenv(openAIBaseURLEnv); baseURL != "" {
-		options = append(options, option.WithBaseURL(baseURL))
-	}
-
-	return options, nil
-}
-
-func decodeResponse(raw string) (Response, bool) {
-	// Pointer fields distinguish required values from missing fields and JSON null.
-	// Pointer elements also reject null entries in tags.
-	var decoded struct {
-		Title    *string    `json:"title"`
-		Summary  *string    `json:"summary"`
-		Priority *string    `json:"priority"`
-		Tags     *[]*string `json:"tags"`
-	}
-
-	decoder := json.NewDecoder(strings.NewReader(raw))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&decoded); err != nil {
-		return Response{}, false
-	}
-	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
-		return Response{}, false
-	}
-	if decoded.Title == nil || decoded.Summary == nil || decoded.Priority == nil || decoded.Tags == nil {
-		return Response{}, false
-	}
-
-	tags := make([]string, len(*decoded.Tags))
-	for i, tag := range *decoded.Tags {
-		if tag == nil {
-			return Response{}, false
-		}
-		tags[i] = *tag
-	}
-
-	return Response{
-		Title:    *decoded.Title,
-		Summary:  *decoded.Summary,
-		Priority: *decoded.Priority,
-		Tags:     tags,
-	}, true
 }
