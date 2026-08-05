@@ -39,6 +39,16 @@ func TestWhitelistAndParameterValidationBeforeDatabase(t *testing.T) {
 	}
 }
 
+func TestTypedNilPoolIsTreatedAsUnavailable(t *testing.T) {
+	var pool *pgxpool.Pool
+	query := QueryDefinition{Name: "by_id", SQL: "SELECT id FROM items WHERE id=$1", Params: []ParamDefinition{{Name: "id", Type: "integer", Required: true, Minimum: floatPtr(1)}}}
+	db := New(pool, []QueryDefinition{query}, time.Second, 10, 1024)
+	result := db.Execute(context.Background(), json.RawMessage(`{"query":"by_id","params":{"id":1}}`))
+	if result.OK || result.Error == nil || result.Error.Code != "database_unavailable" {
+		t.Fatalf("expected database_unavailable instead of panic, got %+v", result)
+	}
+}
+
 func floatPtr(value float64) *float64 { return &value }
 
 func TestIntegrationQueryTimeout(t *testing.T) {

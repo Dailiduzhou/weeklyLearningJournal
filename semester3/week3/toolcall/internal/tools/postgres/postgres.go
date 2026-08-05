@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 	"strings"
 	"time"
@@ -49,9 +50,23 @@ func New(db DB, queries []QueryDefinition, queryTimeout time.Duration, maxRows, 
 		byName[q.Name] = q
 	}
 	return &Tool{
-		db: db, queries: byName, queryTimeout: queryTimeout, maxRows: maxRows, maxBytes: maxBytes,
+		db: nonNil(db), queries: byName, queryTimeout: queryTimeout, maxRows: maxRows, maxBytes: maxBytes,
 		schema: buildSchema(queries),
 	}
+}
+
+func nonNil(db DB) DB {
+	if db == nil {
+		return nil
+	}
+	value := reflect.ValueOf(db)
+	switch value.Kind() {
+	case reflect.Ptr, reflect.Map, reflect.Slice, reflect.Chan, reflect.Func, reflect.Interface:
+		if value.IsNil() {
+			return nil
+		}
+	}
+	return db
 }
 
 func (t *Tool) Definition() tool.Definition {
@@ -130,7 +145,7 @@ func buildSchema(queries []QueryDefinition) map[string]any {
 			"required": []string{"query", "params"}, "additionalProperties": false,
 		})
 	}
-	return map[string]any{"oneOf": variants}
+	return map[string]any{"type": "object", "oneOf": variants}
 }
 
 func (t *Tool) Execute(ctx context.Context, raw json.RawMessage) tool.Result {
