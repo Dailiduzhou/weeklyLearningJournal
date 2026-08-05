@@ -3,13 +3,15 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"toolcall/internal/tool"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type DB interface {
@@ -288,6 +290,10 @@ func databaseFailure(ctx context.Context, err error) tool.Result {
 			code = "timeout"
 		}
 		return tool.Failure(code, ctx.Err().Error(), true)
+	}
+
+	if errors.Is(err, pgx.ErrNoRows) {
+		return tool.Success("No rows", "no expected records")
 	}
 	return tool.Failure("database_error", err.Error(), true)
 }
