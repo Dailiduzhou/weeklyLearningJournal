@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 )
 
@@ -72,6 +73,11 @@ type AuditConfig struct {
 }
 
 func Load(path string) (Config, error) {
+	dotenv, err := godotenv.Read()
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return Config{}, fmt.Errorf("read .env: %w", err)
+	}
+
 	v := viper.New()
 	v.SetConfigType("yaml")
 	v.SetEnvPrefix("AGENT")
@@ -101,15 +107,22 @@ func Load(path string) (Config, error) {
 	}
 	// Compatibility with the conventional OpenAI variable names.
 	if cfg.Model.APIKey == "" {
-		cfg.Model.APIKey = os.Getenv("OPENAI_API_KEY")
+		cfg.Model.APIKey = envOrDotenv("OPENAI_API_KEY", dotenv)
 	}
 	if cfg.Model.BaseURL == "" {
-		cfg.Model.BaseURL = os.Getenv("OPENAI_BASE_URL")
+		cfg.Model.BaseURL = envOrDotenv("OPENAI_BASE_URL", dotenv)
 	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+func envOrDotenv(key string, dotenv map[string]string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return dotenv[key]
 }
 
 func defaults(v *viper.Viper) {
