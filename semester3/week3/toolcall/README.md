@@ -8,11 +8,12 @@ Requires Go 1.25 or newer.
 
 ```sh
 cp config.example.yaml config.yaml
-export OPENAI_API_KEY='...'
+cp .env.example .env
+# Set OPENAI_API_KEY and, if needed, OPENAI_BASE_URL in .env.
 go run . "What is (17 + 5) * 3?"
 ```
 
-With a Responses-compatible OpenAI endpoint, also set `OPENAI_BASE_URL` and select a compatible model in `config.yaml`. Environment variables use the `AGENT_` prefix and double underscores for nesting, for example `AGENT_MODEL__NAME` and `AGENT_DATABASE__DSN`. Environment values override the YAML file, which overrides defaults.
+With a Responses-compatible OpenAI endpoint, also set `OPENAI_BASE_URL` and select a compatible model in `config.yaml`. The application loads `OPENAI_API_KEY` and `OPENAI_BASE_URL` from `.env` for local development; values already present in the process environment take precedence. Agent-specific environment variables use the `AGENT_` prefix and double underscores for nesting, for example `AGENT_MODEL__NAME` and `AGENT_DATABASE__DSN`. `AGENT_*` values override the YAML file, which overrides defaults; conventional `OPENAI_*` values fill otherwise-empty model fields.
 
 Without a positional prompt the program starts an interactive loop. Enter `exit` or `quit` to stop. Results are JSON and include the safe execution trace; audit records are JSON lines on stderr.
 

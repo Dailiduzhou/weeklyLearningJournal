@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/jackc/pgx/v5 v5.9.2
+	github.com/joho/godotenv v1.5.1
 	github.com/openai/openai-go/v3 v3.44.0
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	github.com/spf13/viper v1.21.0
