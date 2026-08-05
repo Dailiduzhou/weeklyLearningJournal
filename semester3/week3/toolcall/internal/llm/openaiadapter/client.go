@@ -10,6 +10,7 @@ import (
 
 	"github.com/openai/openai-go/v3"
 	"github.com/openai/openai-go/v3/option"
+	"github.com/openai/openai-go/v3/responses"
 	"toolcall/internal/llm"
 )
 
@@ -40,69 +41,72 @@ func (c *Client) Complete(ctx context.Context, request llm.Request) (llm.Respons
 	if err != nil {
 		return llm.Response{}, &llm.Error{Kind: llm.ErrorInvalidData, Err: err}
 	}
-	tools := make([]openai.ChatCompletionToolUnionParam, 0, len(request.Tools))
+	tools := make([]responses.ToolUnionParam, 0, len(request.Tools))
 	for _, spec := range request.Tools {
-		tools = append(tools, openai.ChatCompletionFunctionTool(openai.FunctionDefinitionParam{
-			Name:        spec.Name,
-			Description: openai.String(spec.Description),
-			Parameters:  openai.FunctionParameters(spec.Schema),
-		}))
+		tool := responses.ToolParamOfFunction(spec.Name, spec.Schema, false)
+		tool.OfFunction.Description = openai.String(spec.Description)
+		tools = append(tools, tool)
 	}
 
-	completion, err := c.client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+	response, err := c.client.Responses.New(ctx, responses.ResponseNewParams{
 		Model:             c.model,
-		Messages:          messages,
+		Input:             responses.ResponseNewParamsInputUnion{OfInputItemList: messages},
 		Tools:             tools,
 		ParallelToolCalls: openai.Bool(false),
 	})
 	if err != nil {
 		return llm.Response{}, classify(err)
 	}
-	if len(completion.Choices) == 0 {
-		return llm.Response{}, &llm.Error{Kind: llm.ErrorInvalidData, Err: errors.New("completion has no choices")}
-	}
-	message := completion.Choices[0].Message
-	if message.Refusal != "" {
-		return llm.Response{}, &llm.Error{Kind: llm.ErrorPermanent, Err: errors.New("model refused the request")}
-	}
-	result := llm.Message{Role: llm.RoleAssistant, Content: message.Content}
-	for _, call := range message.ToolCalls {
-		if call.Type != "function" {
-			return llm.Response{}, &llm.Error{Kind: llm.ErrorInvalidData, Err: fmt.Errorf("unsupported tool call type %q", call.Type)}
+	if response.Status != "" && response.Status != responses.ResponseStatusCompleted {
+		detail := string(response.Status)
+		if response.Error.Message != "" {
+			detail += ": " + response.Error.Message
+		} else if response.IncompleteDetails.Reason != "" {
+			detail += ": " + response.IncompleteDetails.Reason
 		}
-		result.ToolCalls = append(result.ToolCalls, llm.ToolCall{
-			ID: call.ID, Name: call.Function.Name, Arguments: json.RawMessage(call.Function.Arguments),
-		})
+		return llm.Response{}, &llm.Error{Kind: llm.ErrorInvalidData, Err: fmt.Errorf("response was not completed: %s", detail)}
+	}
+
+	result := llm.Message{Role: llm.RoleAssistant, Content: response.OutputText()}
+	for _, item := range response.Output {
+		switch item.Type {
+		case "message":
+			for _, content := range item.Content {
+				if content.Type == "refusal" {
+					return llm.Response{}, &llm.Error{Kind: llm.ErrorPermanent, Err: errors.New("model refused the request")}
+				}
+			}
+		case "function_call":
+			call := item.AsFunctionCall()
+			result.ToolCalls = append(result.ToolCalls, llm.ToolCall{
+				ID: call.CallID, Name: call.Name, Arguments: json.RawMessage(call.Arguments),
+			})
+		case "reasoning":
+			// Reasoning items contain no user-visible content or locally executable call.
+		default:
+			return llm.Response{}, &llm.Error{Kind: llm.ErrorInvalidData, Err: fmt.Errorf("unsupported response output type %q", item.Type)}
+		}
 	}
 	return llm.Response{Message: result}, nil
 }
 
-func convertMessages(messages []llm.Message) ([]openai.ChatCompletionMessageParamUnion, error) {
-	result := make([]openai.ChatCompletionMessageParamUnion, 0, len(messages))
+func convertMessages(messages []llm.Message) (responses.ResponseInputParam, error) {
+	result := make(responses.ResponseInputParam, 0, len(messages))
 	for _, message := range messages {
 		switch message.Role {
 		case llm.RoleSystem:
-			result = append(result, openai.SystemMessage(message.Content))
+			result = append(result, responses.ResponseInputItemParamOfMessage(message.Content, responses.EasyInputMessageRoleSystem))
 		case llm.RoleUser:
-			result = append(result, openai.UserMessage(message.Content))
+			result = append(result, responses.ResponseInputItemParamOfMessage(message.Content, responses.EasyInputMessageRoleUser))
 		case llm.RoleTool:
-			result = append(result, openai.ToolMessage(message.Content, message.ToolCallID))
+			result = append(result, responses.ResponseInputItemParamOfFunctionCallOutput(message.ToolCallID, message.Content))
 		case llm.RoleAssistant:
-			assistant := openai.ChatCompletionAssistantMessageParam{}
-			if message.Content != "" {
-				assistant.Content.OfString = openai.String(message.Content)
+			if message.Content != "" || len(message.ToolCalls) == 0 {
+				result = append(result, responses.ResponseInputItemParamOfMessage(message.Content, responses.EasyInputMessageRoleAssistant))
 			}
 			for _, call := range message.ToolCalls {
-				assistant.ToolCalls = append(assistant.ToolCalls, openai.ChatCompletionMessageToolCallUnionParam{
-					OfFunction: &openai.ChatCompletionMessageFunctionToolCallParam{
-						ID: call.ID,
-						Function: openai.ChatCompletionMessageFunctionToolCallFunctionParam{
-							Name: call.Name, Arguments: string(call.Arguments),
-						},
-					},
-				})
+				result = append(result, responses.ResponseInputItemParamOfFunctionCall(string(call.Arguments), call.ID, call.Name))
 			}
-			result = append(result, openai.ChatCompletionMessageParamUnion{OfAssistant: &assistant})
 		default:
 			return nil, fmt.Errorf("unsupported message role %q", message.Role)
 		}
