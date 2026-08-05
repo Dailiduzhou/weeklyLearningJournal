@@ -74,3 +74,45 @@ func TestDatabaseRequiresDSNWhenEnabled(t *testing.T) {
 		t.Fatal("expected missing database DSN to fail validation")
 	}
 }
+
+func TestDotenvProvidesDatabaseDSN(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte("model:\n  name: test-model\n  api_key: test-key\ndatabase:\n  enabled: true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("AGENT_DATABASE__DSN=postgres://agent_readonly:secret@localhost:5432/agent\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	t.Setenv("AGENT_DATABASE__DSN", "")
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Database.DSN != "postgres://agent_readonly:secret@localhost:5432/agent" {
+		t.Fatalf("dotenv DSN was not loaded: %+v", cfg.Database)
+	}
+}
+
+func TestProcessEnvironmentOverridesDotenvDSN(t *testing.T) {
+	dir := t.TempDir()
+	configPath := filepath.Join(dir, "config.yaml")
+	if err := os.WriteFile(configPath, []byte("model:\n  name: test-model\n  api_key: test-key\ndatabase:\n  enabled: true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, ".env"), []byte("AGENT_DATABASE__DSN=postgres://dotenv.example/agent\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Chdir(dir)
+	t.Setenv("AGENT_DATABASE__DSN", "postgres://process.example/agent")
+
+	cfg, err := Load(configPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Database.DSN != "postgres://process.example/agent" {
+		t.Fatalf("process environment did not take precedence: %+v", cfg.Database)
+	}
+}

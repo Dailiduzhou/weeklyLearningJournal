@@ -112,6 +112,10 @@ func Load(path string) (Config, error) {
 	if cfg.Model.BaseURL == "" {
 		cfg.Model.BaseURL = envOrDotenv("OPENAI_BASE_URL", dotenv)
 	}
+	// Connection strings are secrets and are never set in the config file.
+	if cfg.Database.DSN == "" {
+		cfg.Database.DSN = envOrDotenv("AGENT_DATABASE__DSN", dotenv)
+	}
 	if err := cfg.Validate(); err != nil {
 		return Config{}, err
 	}
