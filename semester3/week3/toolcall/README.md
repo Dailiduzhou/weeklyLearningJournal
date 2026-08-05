@@ -29,7 +29,7 @@ docker compose up -d
 export AGENT_DATABASE__DSN='postgres://agent_readonly:local-readonly-password@localhost:5432/agent'
 ```
 
-The initialization script creates `agent_readonly` and grants only schema usage and `SELECT`. Add the application schema as the admin account, then restart the agent with database support enabled.
+The initialization scripts create an `orders` table with sample rows for customer IDs 1–3, then create `agent_readonly` and grant it only schema usage and `SELECT`. PostgreSQL only runs these scripts for a new data directory. If the `pgdata` volume already exists and may be discarded, run `docker compose down -v` before `docker compose up -d` to recreate it with the seed data.
 
 ## Test
 
