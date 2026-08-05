@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 
 	"toolcall/internal/audit"
@@ -58,6 +59,8 @@ type Runtime struct {
 	model    llm.Client
 	registry *tool.Registry
 	audit    audit.Logger
+	mu       sync.Mutex
+	history  []llm.Message
 }
 
 func New(config Config, model llm.Client, registry *tool.Registry, auditLogger audit.Logger) (*Runtime, error) {
@@ -76,6 +79,9 @@ func New(config Config, model llm.Client, registry *tool.Registry, auditLogger a
 }
 
 func (r *Runtime) Run(parent context.Context, prompt string) Result {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
 	recorder := trace.NewRecorder()
 	taskID, err := newTaskID()
 	if err != nil {
@@ -85,10 +91,13 @@ func (r *Runtime) Run(parent context.Context, prompt string) Result {
 	ctx, cancel := context.WithTimeout(parent, r.config.TaskTimeout)
 	defer cancel()
 
-	messages := []llm.Message{
-		{Role: llm.RoleSystem, Content: systemPrompt},
-		{Role: llm.RoleUser, Content: prompt},
+	messages := make([]llm.Message, 0, len(r.history)+1)
+	if len(r.history) == 0 {
+		messages = append(messages, llm.Message{Role: llm.RoleSystem, Content: systemPrompt})
 	}
+	messages = append(messages, r.history...)
+	messages = append(messages, llm.Message{Role: llm.RoleUser, Content: prompt})
+	messages = trimHistory(messages, r.config.MaxHistoryBytes)
 	var previousFailedFingerprint string
 	repeatedFailures := 0
 	unknownTools := 0
@@ -122,10 +131,11 @@ func (r *Runtime) Run(parent context.Context, prompt string) Result {
 			if message.Content == "" {
 				result.Stop = StopModelError
 				result.Error = "model returned neither an answer nor a tool call"
-			} else {
-				result.Answer = message.Content
-				result.Stop = StopFinalAnswer
-			}
+		} else {
+			result.Answer = message.Content
+			result.Stop = StopFinalAnswer
+			r.history = trimHistory(append(messages, message), r.config.MaxHistoryBytes)
+		}
 			return finish(result, recorder, round)
 		}
 		messages = append(messages, message)
@@ -258,6 +268,27 @@ func contextStop(ctx context.Context) (StopReason, bool) {
 func historySize(messages []llm.Message) int {
 	b, _ := json.Marshal(messages)
 	return len(b)
+}
+
+// trimHistory drops the oldest complete turns (user message and everything up
+// to the next user message) until the remaining history fits within maxBytes.
+// The system prompt and the most recent prompt are always kept.
+func trimHistory(messages []llm.Message, maxBytes int) []llm.Message {
+	if len(messages) < 2 || historySize(messages) <= maxBytes {
+		return messages
+	}
+	for i := 1; i < len(messages); i++ {
+		if messages[i].Role != llm.RoleUser {
+			continue
+		}
+		candidate := messages[i:]
+		if historySize(candidate)+historySize(messages[:1]) <= maxBytes {
+			result := make([]llm.Message, 1, len(candidate)+1)
+			result[0] = messages[0]
+			return append(result, candidate...)
+		}
+	}
+	return messages[:1]
 }
 
 func callFingerprint(name string, raw json.RawMessage) string {

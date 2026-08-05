@@ -196,6 +196,77 @@ func TestLargeToolResultIsTruncatedAndAudited(t *testing.T) {
 	}
 }
 
+func TestSessionHistoryCarriesAcrossRuns(t *testing.T) {
+	model := &scriptedModel{steps: []modelStep{answer("first reply"), answer("second reply")}}
+	runtime := testRuntime(t, model, nil, calculator.New())
+	first := runtime.Run(context.Background(), "hello")
+	if first.Stop != StopFinalAnswer || first.Answer != "first reply" {
+		t.Fatalf("unexpected first result: %+v", first)
+	}
+	second := runtime.Run(context.Background(), "what did I just say?")
+	if second.Stop != StopFinalAnswer || second.Answer != "second reply" {
+		t.Fatalf("unexpected second result: %+v", second)
+	}
+	request := model.requests[1]
+	if !requestContains(request, "hello") || !requestContains(request, "first reply") || !requestContains(request, "what did I just say?") {
+		t.Fatalf("second request lost conversation context: %#v", request.Messages)
+	}
+	systemCount := 0
+	for _, message := range request.Messages {
+		if message.Role == llm.RoleSystem {
+			systemCount++
+		}
+	}
+	if systemCount != 1 {
+		t.Fatalf("expected exactly one system message, got %d", systemCount)
+	}
+}
+
+func TestSessionHistoryNotStoredOnFailedRun(t *testing.T) {
+	model := &scriptedModel{steps: []modelStep{{err: errors.New("boom")}, answer("recovered")}}
+	runtime := testRuntime(t, model, nil, calculator.New())
+	first := runtime.Run(context.Background(), "will fail")
+	if first.Stop != StopModelError {
+		t.Fatalf("stop = %s, want %s", first.Stop, StopModelError)
+	}
+	second := runtime.Run(context.Background(), "retry")
+	if second.Stop != StopFinalAnswer || len(model.requests) != 2 {
+		t.Fatalf("unexpected second result: %+v", second)
+	}
+	if requestContains(model.requests[1], "will fail") || requestContains(model.requests[1], "boom") {
+		t.Fatalf("failed run leaked into session history: %#v", model.requests[1].Messages)
+	}
+}
+
+func TestSessionHistoryTrimsOldestTurns(t *testing.T) {
+	model := &scriptedModel{steps: []modelStep{answer("one"), answer("two"), answer("three")}}
+	registry, err := tool.NewRegistry(calculator.New())
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime, err := New(Config{
+		MaxRounds: 4, TaskTimeout: time.Second, ModelTimeout: 200 * time.Millisecond,
+		ToolTimeout: 100 * time.Millisecond, MaxToolResultBytes: 512, MaxHistoryBytes: 2048,
+		MaxRepeatedFailures: 3, MaxUnknownTools: 2, ModelRetries: 1,
+	}, model, registry, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if runtime.Run(ctx, "first question "+strings.Repeat("a", 500)).Stop != StopFinalAnswer ||
+		runtime.Run(ctx, "second question "+strings.Repeat("b", 500)).Stop != StopFinalAnswer ||
+		runtime.Run(ctx, "third question "+strings.Repeat("c", 500)).Stop != StopFinalAnswer {
+		t.Fatal("a run did not finish with a final answer")
+	}
+	last := model.requests[2]
+	if requestContains(last, "first question") {
+		t.Fatal("oldest turn was not trimmed")
+	}
+	if !requestContains(last, "second question") || !requestContains(last, "third question") {
+		t.Fatal("recent turns were dropped by trimming")
+	}
+}
+
 func requestContains(request llm.Request, substring string) bool {
 	for _, message := range request.Messages {
 		if strings.Contains(message.Content, substring) {

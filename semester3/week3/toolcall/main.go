@@ -53,6 +53,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 	logger := slog.New(slog.NewJSONHandler(stderr, &slog.HandlerOptions{Level: level}))
 
+	logger.Info("Configuration loaded")
+
 	rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
@@ -72,6 +74,10 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 			return fmt.Errorf("connect database: %w", err)
 		}
 	}
+	var db postgresTool.DB
+	if pool != nil {
+		db = pool
+	}
 	queries := make([]postgresTool.QueryDefinition, 0, len(cfg.Database.Queries))
 	for _, q := range cfg.Database.Queries {
 		params := make([]postgresTool.ParamDefinition, 0, len(q.Params))
@@ -83,7 +89,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		}
 		queries = append(queries, postgresTool.QueryDefinition{Name: q.Name, Description: q.Description, SQL: q.SQL, Params: params})
 	}
-	dbTool := postgresTool.New(pool, queries, cfg.Database.QueryTimeout, cfg.Database.MaxRows, cfg.Database.MaxBytes)
+	dbTool := postgresTool.New(db, queries, cfg.Database.QueryTimeout, cfg.Database.MaxRows, cfg.Database.MaxBytes)
 	registry, err := tool.NewRegistry(calculator.New(), docs, dbTool)
 	if err != nil {
 		return err
