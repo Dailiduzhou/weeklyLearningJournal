@@ -1,6 +1,6 @@
 # Minimal Agent Runtime
 
-A framework-free Go implementation of a sequential Chat Completions tool loop. It includes compiled JSON Schema validation, derived context deadlines, retry classification, duplicate-failure detection, read-only PostgreSQL query whitelisting, structured audit logs, and a safe public trace.
+A framework-free Go implementation of a sequential Responses API tool loop. It includes compiled JSON Schema validation, derived context deadlines, retry classification, duplicate-failure detection, read-only PostgreSQL query whitelisting, structured audit logs, and a safe public trace.
 
 ## Run
 
@@ -12,7 +12,7 @@ export OPENAI_API_KEY='...'
 go run . "What is (17 + 5) * 3?"
 ```
 
-With an OpenAI-compatible endpoint, also set `OPENAI_BASE_URL` and select a compatible model in `config.yaml`. Environment variables use the `AGENT_` prefix and double underscores for nesting, for example `AGENT_MODEL__NAME` and `AGENT_DATABASE__DSN`. Environment values override the YAML file, which overrides defaults.
+With a Responses-compatible OpenAI endpoint, also set `OPENAI_BASE_URL` and select a compatible model in `config.yaml`. Environment variables use the `AGENT_` prefix and double underscores for nesting, for example `AGENT_MODEL__NAME` and `AGENT_DATABASE__DSN`. Environment values override the YAML file, which overrides defaults.
 
 Without a positional prompt the program starts an interactive loop. Enter `exit` or `quit` to stop. Results are JSON and include the safe execution trace; audit records are JSON lines on stderr.
 

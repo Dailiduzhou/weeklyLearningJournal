@@ -14,7 +14,6 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"toolcall/internal/agent"
 	"toolcall/internal/audit"
 	"toolcall/internal/config"
@@ -23,6 +22,8 @@ import (
 	"toolcall/internal/tools/calculator"
 	"toolcall/internal/tools/docsearch"
 	postgresTool "toolcall/internal/tools/postgres"
+
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
