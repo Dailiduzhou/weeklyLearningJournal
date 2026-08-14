@@ -1,0 +1,47 @@
+[model]
+# Secrets belong in AGENT_MODEL__API_KEY or OPENAI_API_KEY.
+name = "gpt-5.6-terra"
+timeout = "30s"
+max_retries = 2
+
+[agent]
+max_rounds = 8
+task_timeout = "2m"
+tool_timeout = "10s"
+max_tool_result_bytes = 32768
+max_history_bytes = 262144
+max_repeated_failures = 3
+max_unknown_tools = 3
+
+[documents]
+directory = "./docs"
+chunk_runes = 1200
+max_results = 5
+
+[database]
+enabled = false
+# Set with AGENT_DATABASE__DSN; never commit a connection string.
+query_timeout = "3s"
+max_rows = 100
+max_bytes = 65536
+
+[[database.queries]]
+name = "recent_orders"
+description = "List recent orders for one customer."
+sql = "SELECT id, status, total_cents, created_at FROM orders WHERE customer_id = $1 ORDER BY created_at DESC LIMIT $2"
+
+[[database.queries.params]]
+name = "customer_id"
+type = "integer"
+required = true
+minimum = 1
+
+[[database.queries.params]]
+name = "limit"
+type = "integer"
+required = true
+minimum = 1
+maximum = 100
+
+[audit]
+level = "info"

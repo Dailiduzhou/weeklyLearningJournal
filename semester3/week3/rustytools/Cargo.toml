@@ -1,0 +1,32 @@
+[package]
+name = "rustytools"
+version = "0.1.0"
+edition = "2024"
+description = "A minimal, auditable OpenAI Responses API tool-calling runtime"
+license = "MIT"
+
+[dependencies]
+async-trait = "0.1"
+clap = { version = "4", features = ["derive"] }
+chrono = { version = "0.4", features = ["clock", "serde"] }
+dotenvy = "0.15"
+futures-util = "0.3"
+humantime = "2"
+jsonschema = "0.33"
+openai-oxide = { version = "0.15.0", default-features = false, features = ["responses"] }
+regex = "1"
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12"] }
+rustls-native-certs = "0.8"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
+tokio-postgres = { version = "0.7", features = ["with-serde_json-1"] }
+tokio-postgres-rustls = "0.13"
+toml = "0.9"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+uuid = { version = "1", features = ["serde", "v4"] }
+
+[dev-dependencies]
+tempfile = "3"
