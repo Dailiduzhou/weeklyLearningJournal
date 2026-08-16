@@ -1,0 +1,36 @@
+# Precedence: GORAG_* environment variables > this file > built-in defaults.
+# Never put production credentials in this file; use environment variables or
+# your deployment platform's secret mechanism.
+server:
+  address: ":8080"
+  read_header_timeout: 5s
+  shutdown_timeout: 15s
+
+database:
+  url: "postgres://gorag:gorag@localhost:5432/gorag?sslmode=disable"
+
+ollama:
+  base_url: "http://localhost:11434"
+  timeout: 30s
+
+embedding:
+  dimension: 1024
+
+documents:
+  dir: "./docs"
+
+retrieval:
+  top_k: 10
+  max_context: 5
+  similarity_threshold: 0.5
+
+answer:
+  provider: "ollama"
+  base_url: "http://localhost:11434"
+  model: "qwen3:4b"
+  api_key: ""
+  timeout: 60s
+
+startup:
+  check_timeout: 30s
+  retry_interval: 1s

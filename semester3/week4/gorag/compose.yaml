@@ -1,0 +1,129 @@
+name: gorag
+
+services:
+  postgres:
+    image: pgvector/pgvector:0.8.0-pg17
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-gorag}
+      POSTGRES_USER: ${POSTGRES_USER:-gorag}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copy .env.example to .env and set POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:${GORAG_POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+  migrate:
+    image: migrate/migrate:v4.18.3
+    command:
+      - -path=/migrations
+      - -database=${GORAG_DATABASE_URL:?set GORAG_DATABASE_URL in .env}
+      - up
+    volumes:
+      - ./migrations:/migrations:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  ollama:
+    image: ollama/ollama:0.32.0
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "127.0.0.1:${GORAG_OLLAMA_PORT:-11434}:11434"
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+    restart: unless-stopped
+
+  ollama-model-init:
+    image: ollama/ollama:0.32.0
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      GORAG_ANSWER_PROVIDER: ${GORAG_ANSWER_PROVIDER:-ollama}
+      GORAG_ANSWER_MODEL: ${GORAG_ANSWER_MODEL:-qwen3:4b}
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        ollama pull "qwen3-embedding:0.6b"
+        if [ "$${GORAG_ANSWER_PROVIDER}" = "ollama" ]; then
+          ollama pull "$${GORAG_ANSWER_MODEL}"
+        fi
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: "no"
+
+  server:
+    image: gorag-server:${GORAG_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: server
+    environment: &gorag-environment
+      GORAG_SERVER_ADDRESS: ${GORAG_SERVER_ADDRESS:-:8080}
+      GORAG_DATABASE_URL: ${GORAG_DATABASE_URL:?set GORAG_DATABASE_URL in .env}
+      GORAG_OLLAMA_BASE_URL: ${GORAG_OLLAMA_BASE_URL:-http://ollama:11434}
+      GORAG_OLLAMA_TIMEOUT: ${GORAG_OLLAMA_TIMEOUT:-30s}
+      GORAG_EMBEDDING_DIMENSION: ${GORAG_EMBEDDING_DIMENSION:-1024}
+      GORAG_DOCUMENTS_DIR: ${GORAG_DOCUMENTS_DIR:-/app/docs}
+      GORAG_RETRIEVAL_TOP_K: ${GORAG_RETRIEVAL_TOP_K:-10}
+      GORAG_RETRIEVAL_MAX_CONTEXT: ${GORAG_RETRIEVAL_MAX_CONTEXT:-5}
+      GORAG_RETRIEVAL_SIMILARITY_THRESHOLD: ${GORAG_RETRIEVAL_SIMILARITY_THRESHOLD:-0.5}
+      GORAG_ANSWER_PROVIDER: ${GORAG_ANSWER_PROVIDER:-ollama}
+      GORAG_ANSWER_BASE_URL: ${GORAG_ANSWER_BASE_URL:-http://ollama:11434}
+      GORAG_ANSWER_MODEL: ${GORAG_ANSWER_MODEL:-qwen3:4b}
+      GORAG_ANSWER_API_KEY: ${GORAG_ANSWER_API_KEY:-}
+      GORAG_ANSWER_TIMEOUT: ${GORAG_ANSWER_TIMEOUT:-60s}
+      GORAG_STARTUP_CHECK_TIMEOUT: ${GORAG_STARTUP_CHECK_TIMEOUT:-30s}
+      GORAG_STARTUP_RETRY_INTERVAL: ${GORAG_STARTUP_RETRY_INTERVAL:-1s}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./docs:/app/docs:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      ollama-model-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:8080/healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    stop_grace_period: 20s
+    restart: unless-stopped
+
+  indexer:
+    image: gorag-indexer:${GORAG_IMAGE_TAG:-local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: indexer
+    profiles: ["tools"]
+    environment: *gorag-environment
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+      - ./docs:/app/docs:ro
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      ollama-model-init:
+        condition: service_completed_successfully
+    restart: "no"
+
+volumes:
+  postgres-data:
+  ollama-data:
