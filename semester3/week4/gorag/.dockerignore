@@ -1,0 +1,10 @@
+.git
+.codegraph
+.env
+.env.*
+!.env.example
+docs
+project
+testdata
+README.md
+compose.yaml
