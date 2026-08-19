@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"gorag/internal/document"
 	"gorag/internal/embedding"
@@ -142,12 +144,114 @@ func TestContextCancellationStopsWorkAndFinalizesRun(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("Sync() error = %v, want context.Canceled", err)
 	}
-	if result.Documents != 1 || embedder.calls != 1 {
-		t.Fatalf("cancellation processed documents=%d embedding calls=%d", result.Documents, embedder.calls)
+	if result.Documents != 1 || embedder.callCount() != 1 {
+		t.Fatalf("cancellation processed documents=%d embedding calls=%d", result.Documents, embedder.callCount())
 	}
 	last := store.runs[len(store.runs)-1]
 	if last.Status != repository.IndexRunStatusFailed || store.finalizeSawCancelled {
 		t.Fatalf("cancelled run = %#v, finalizeSawCancelled=%v", last, store.finalizeSawCancelled)
+	}
+}
+
+func TestSyncLimitsDocumentConcurrency(t *testing.T) {
+	documents := make([]document.Document, 6)
+	for index := range documents {
+		documents[index] = testDocument(fmt.Sprintf("doc-%d.md", index), fmt.Sprintf("hash-%d", index))
+	}
+	release := make(chan struct{})
+	entered := make(chan string, len(documents))
+	embedder := &fakeEmbedder{entered: entered, release: release}
+	indexer := newTestIndexerWithConfig(t, Config{DocsRoot: "docs", DocumentConcurrency: 3}, &fakeLoader{documents: documents}, newMemoryStore(), embedder)
+
+	type syncResult struct {
+		result Result
+		err    error
+	}
+	done := make(chan syncResult, 1)
+	go func() {
+		result, err := indexer.Sync(context.Background())
+		done <- syncResult{result: result, err: err}
+	}()
+	for range 3 {
+		select {
+		case <-entered:
+		case <-time.After(time.Second):
+			t.Fatal("three document workers did not start")
+		}
+	}
+	select {
+	case path := <-entered:
+		t.Fatalf("document %q exceeded configured concurrency before a slot was released", path)
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(release)
+	completed := <-done
+	if completed.err != nil || completed.result.Added != len(documents) {
+		t.Fatalf("Sync() = %#v, error %v", completed.result, completed.err)
+	}
+	if embedder.maximumActive() != 3 {
+		t.Fatalf("maximum active documents = %d, want 3", embedder.maximumActive())
+	}
+}
+
+func TestSyncConcurrentFailuresRemainOrderedAndIsolated(t *testing.T) {
+	loader := &fakeLoader{documents: []document.Document{
+		testDocument("a-bad.md", "a"),
+		testDocument("b-good.md", "b"),
+		testDocument("c-bad.md", "c"),
+	}}
+	store := newMemoryStore()
+	embedder := &fakeEmbedder{failPaths: map[string]bool{"a-bad.md": true, "c-bad.md": true}}
+	indexer := newTestIndexerWithConfig(t, Config{DocsRoot: "docs", DocumentConcurrency: 3}, loader, store, embedder)
+
+	result, err := indexer.Sync(context.Background())
+	if err == nil || result.Added != 1 || result.Failed != 2 {
+		t.Fatalf("Sync() = %#v, error %v", result, err)
+	}
+	if len(result.FailurePaths) != 2 || result.FailurePaths[0] != "a-bad.md" || result.FailurePaths[1] != "c-bad.md" {
+		t.Fatalf("FailurePaths = %q, want stable input order", result.FailurePaths)
+	}
+	if strings.Index(err.Error(), "a-bad.md") > strings.Index(err.Error(), "c-bad.md") {
+		t.Fatalf("joined errors are not in input order: %v", err)
+	}
+	if store.byPath["b-good.md"].CurrentVersion == nil {
+		t.Fatal("healthy document was not committed")
+	}
+}
+
+func TestSyncCancellationStopsDispatchingDocuments(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	documents := make([]document.Document, 5)
+	for index := range documents {
+		documents[index] = testDocument(fmt.Sprintf("doc-%d.md", index), fmt.Sprintf("hash-%d", index))
+	}
+	entered := make(chan string, len(documents))
+	embedder := &fakeEmbedder{entered: entered, release: make(chan struct{})}
+	indexer := newTestIndexerWithConfig(t, Config{DocsRoot: "docs", DocumentConcurrency: 2}, &fakeLoader{documents: documents}, newMemoryStore(), embedder)
+
+	type syncResult struct {
+		result Result
+		err    error
+	}
+	done := make(chan syncResult, 1)
+	go func() {
+		result, err := indexer.Sync(ctx)
+		done <- syncResult{result: result, err: err}
+	}()
+	for range 2 {
+		select {
+		case <-entered:
+		case <-time.After(time.Second):
+			t.Fatal("two document workers did not start")
+		}
+	}
+	cancel()
+	completed := <-done
+	if !errors.Is(completed.err, context.Canceled) {
+		t.Fatalf("Sync() error = %v, want context.Canceled", completed.err)
+	}
+	if embedder.callCount() != 2 || completed.result.Documents != 2 {
+		t.Fatalf("cancellation processed documents=%d embedding calls=%d, want 2 in-flight documents only", completed.result.Documents, embedder.callCount())
 	}
 }
 
@@ -175,12 +279,16 @@ func TestAllLifecycleOperations(t *testing.T) {
 }
 
 func newTestIndexer(t *testing.T, loader *fakeLoader, store *memoryStore, embedder *fakeEmbedder) *Indexer {
+	return newTestIndexerWithConfig(t, Config{DocsRoot: "docs"}, loader, store, embedder)
+}
+
+func newTestIndexerWithConfig(t *testing.T, config Config, loader *fakeLoader, store *memoryStore, embedder *fakeEmbedder) *Indexer {
 	t.Helper()
 	if embedder == nil {
 		embedder = &fakeEmbedder{}
 	}
 	sequence := 0
-	indexer, err := New(Config{DocsRoot: "docs"}, loader, fakeSplitter{}, embedder, store,
+	indexer, err := New(config, loader, fakeSplitter{}, embedder, store,
 		WithVersionGenerator(func() (string, error) {
 			sequence++
 			return fmt.Sprintf("version-%d", sequence), nil
@@ -237,18 +345,58 @@ func (fakeSplitter) Split(doc document.Document) ([]document.Chunk, error) {
 }
 
 type fakeEmbedder struct {
-	failPath string
-	cancel   context.CancelFunc
-	calls    int
+	mu        sync.Mutex
+	failPath  string
+	failPaths map[string]bool
+	cancel    context.CancelFunc
+	calls     int
+	active    int
+	maximum   int
+	entered   chan<- string
+	release   <-chan struct{}
 }
 
 func (e *fakeEmbedder) EmbedDocuments(ctx context.Context, inputs []embedding.DocumentInput) ([][]float32, error) {
+	e.mu.Lock()
 	e.calls++
-	if len(inputs) > 0 && inputs[0].SourcePath == e.failPath {
+	e.active++
+	if e.active > e.maximum {
+		e.maximum = e.active
+	}
+	path := ""
+	if len(inputs) > 0 {
+		path = inputs[0].SourcePath
+	}
+	fail := path == e.failPath || e.failPaths[path]
+	cancel := e.cancel
+	entered := e.entered
+	release := e.release
+	e.mu.Unlock()
+	defer func() {
+		e.mu.Lock()
+		e.active--
+		e.mu.Unlock()
+	}()
+
+	if entered != nil {
+		select {
+		case entered <- path:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	if release != nil {
+		select {
+		case <-release:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+	}
+	if fail {
 		return nil, errors.New("embedding unavailable")
 	}
-	if e.cancel != nil {
-		e.cancel()
+	if cancel != nil {
+		cancel()
 		return nil, ctx.Err()
 	}
 	vectors := make([][]float32, len(inputs))
@@ -256,6 +404,18 @@ func (e *fakeEmbedder) EmbedDocuments(ctx context.Context, inputs []embedding.Do
 		vectors[index] = make([]float32, embedding.VectorDimension)
 	}
 	return vectors, nil
+}
+
+func (e *fakeEmbedder) callCount() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.calls
+}
+
+func (e *fakeEmbedder) maximumActive() int {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	return e.maximum
 }
 
 func (*fakeEmbedder) Model() string  { return embedding.DefaultModel }
@@ -298,6 +458,8 @@ func (s *memoryStore) GetDocumentByPath(ctx context.Context, path string) (repos
 	if err := ctx.Err(); err != nil {
 		return repository.Document{}, err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	record, exists := s.byPath[path]
 	if !exists {
 		return repository.Document{}, errors.New("not found")
@@ -309,6 +471,8 @@ func (s *memoryStore) ListDocuments(ctx context.Context) ([]repository.Document,
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	documents := make([]repository.Document, 0, len(s.byPath))
 	for _, record := range s.byPath {
 		documents = append(documents, record)
@@ -321,6 +485,8 @@ func (s *memoryStore) InsertVersion(ctx context.Context, documentID int64, versi
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.insertErr != nil {
 		return s.insertErr
 	}
@@ -336,6 +502,8 @@ func (s *memoryStore) ActivateVersion(ctx context.Context, activation repository
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.activateErr != nil {
 		return s.activateErr
 	}
@@ -360,6 +528,8 @@ func (s *memoryStore) MarkDocumentDeleted(ctx context.Context, documentID int64)
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	for path, record := range s.byPath {
 		if record.ID == documentID {
 			record.Status = repository.DocumentStatusDeleted
@@ -376,12 +546,16 @@ func (s *memoryStore) StartIndexRun(ctx context.Context, runType string) (reposi
 	if err := ctx.Err(); err != nil {
 		return repository.IndexRun{}, err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	run := repository.IndexRun{ID: int64(len(s.runs) + 1), RunType: runType, Status: repository.IndexRunStatusRunning}
 	s.runs = append(s.runs, run)
 	return run, nil
 }
 
 func (s *memoryStore) CompleteIndexRun(ctx context.Context, runID int64, documents, chunks int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.finalizeSawCancelled = s.finalizeSawCancelled || ctx.Err() != nil
 	if err := ctx.Err(); err != nil {
 		return err
@@ -393,6 +567,8 @@ func (s *memoryStore) CompleteIndexRun(ctx context.Context, runID int64, documen
 }
 
 func (s *memoryStore) FailIndexRun(ctx context.Context, runID int64, documents, chunks int, runErr error) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	s.finalizeSawCancelled = s.finalizeSawCancelled || ctx.Err() != nil
 	if err := ctx.Err(); err != nil {
 		return err

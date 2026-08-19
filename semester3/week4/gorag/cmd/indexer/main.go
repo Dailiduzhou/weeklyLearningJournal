@@ -72,6 +72,7 @@ func run(ctx context.Context, args []string, logger *slog.Logger, stderr io.Writ
 	}
 	embedder, err := embedding.NewClient(embedding.Config{
 		BaseURL: cfg.Ollama.BaseURL, Model: embedding.DefaultModel,
+		BatchSize: cfg.Embedding.BatchSize, MaxConcurrency: cfg.Embedding.MaxConcurrency,
 		RequestTimeout: cfg.Ollama.Timeout,
 	})
 	if err != nil {
@@ -85,7 +86,9 @@ func run(ctx context.Context, args []string, logger *slog.Logger, stderr io.Writ
 	}
 	defer store.Close()
 
-	usecase, err := indexerusecase.New(indexerusecase.Config{DocsRoot: cfg.Documents.Dir}, documentLoader, documentSplitter, embedder, store)
+	usecase, err := indexerusecase.New(indexerusecase.Config{
+		DocsRoot: cfg.Documents.Dir, DocumentConcurrency: cfg.Indexing.DocumentConcurrency,
+	}, documentLoader, documentSplitter, embedder, store)
 	if err != nil {
 		logger.Error("create indexer", "error", err)
 		return 1

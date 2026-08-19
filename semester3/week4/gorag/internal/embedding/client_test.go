@@ -191,6 +191,164 @@ func TestEmbedDocumentsLimitsConcurrency(t *testing.T) {
 	}
 }
 
+func TestEmbedClientLimitsConcurrencyAcrossCalls(t *testing.T) {
+	t.Parallel()
+
+	var active atomic.Int32
+	var maximum atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		current := active.Add(1)
+		defer active.Add(-1)
+		for {
+			old := maximum.Load()
+			if current <= old || maximum.CompareAndSwap(old, current) {
+				break
+			}
+		}
+		var body embedRequest
+		_ = json.NewDecoder(request.Body).Decode(&body)
+		time.Sleep(20 * time.Millisecond)
+		vectors := make([][]float32, len(body.Input))
+		for index := range vectors {
+			vectors[index] = testVector(1)
+		}
+		_ = json.NewEncoder(writer).Encode(embedResponse{Embeddings: vectors})
+	}))
+	defer server.Close()
+
+	client := newTestClient(t, server.URL, Config{BatchSize: 1, MaxConcurrency: 2})
+	start := make(chan struct{})
+	errors := make(chan error, 6)
+	var calls sync.WaitGroup
+	for index := range 6 {
+		calls.Add(1)
+		go func() {
+			defer calls.Done()
+			<-start
+			if index%2 == 0 {
+				_, err := client.EmbedQuery(context.Background(), fmt.Sprintf("question-%d", index))
+				errors <- err
+				return
+			}
+			_, err := client.EmbedDocuments(context.Background(), []DocumentInput{{
+				SourcePath: fmt.Sprintf("doc-%d.md", index), ChunkIndex: 0, Text: "body",
+			}})
+			errors <- err
+		}()
+	}
+	close(start)
+	calls.Wait()
+	close(errors)
+	for err := range errors {
+		if err != nil {
+			t.Fatalf("concurrent embedding call error = %v", err)
+		}
+	}
+	if maximum.Load() != 2 {
+		t.Fatalf("maximum concurrency = %d, want 2 across all client calls", maximum.Load())
+	}
+}
+
+func TestEmbedRetryWaitDoesNotHoldConcurrencySlot(t *testing.T) {
+	t.Parallel()
+
+	var retryCalls atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		var body embedRequest
+		_ = json.NewDecoder(request.Body).Decode(&body)
+		if strings.HasSuffix(body.Input[0], "retry") && retryCalls.Add(1) == 1 {
+			http.Error(writer, "try later", http.StatusServiceUnavailable)
+			return
+		}
+		_ = json.NewEncoder(writer).Encode(embedResponse{Embeddings: [][]float32{testVector(1)}})
+	}))
+	defer server.Close()
+
+	waiting := make(chan struct{}, 1)
+	resume := make(chan struct{})
+	var resumeOnce sync.Once
+	resumeRetry := func() { resumeOnce.Do(func() { close(resume) }) }
+	t.Cleanup(resumeRetry)
+	client := newTestClient(t, server.URL, Config{MaxConcurrency: 1, MaxRetries: 1}, WithRetryWait(func(ctx context.Context, _ time.Duration) error {
+		waiting <- struct{}{}
+		select {
+		case <-resume:
+			return nil
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}))
+	retryDone := make(chan error, 1)
+	go func() {
+		_, err := client.EmbedQuery(context.Background(), "retry")
+		retryDone <- err
+	}()
+	select {
+	case <-waiting:
+	case <-time.After(time.Second):
+		t.Fatal("retry did not enter backoff")
+	}
+
+	healthyCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if _, err := client.EmbedQuery(healthyCtx, "healthy"); err != nil {
+		t.Fatalf("healthy query was blocked by retry backoff: %v", err)
+	}
+	resumeRetry()
+	if err := <-retryDone; err != nil {
+		t.Fatalf("retried query error = %v", err)
+	}
+}
+
+func TestEmbedCancellationWhileWaitingForConcurrencySlot(t *testing.T) {
+	t.Parallel()
+
+	started := make(chan struct{}, 1)
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseFirst := func() { releaseOnce.Do(func() { close(release) }) }
+	t.Cleanup(releaseFirst)
+	var requests atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		requests.Add(1)
+		started <- struct{}{}
+		<-release
+		_ = json.NewEncoder(writer).Encode(embedResponse{Embeddings: [][]float32{testVector(1)}})
+	}))
+	defer server.Close()
+	client := newTestClient(t, server.URL, Config{MaxConcurrency: 1})
+
+	firstDone := make(chan error, 1)
+	go func() {
+		_, err := client.EmbedQuery(context.Background(), "first")
+		firstDone <- err
+	}()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("first query did not acquire concurrency slot")
+	}
+
+	waitingCtx, cancel := context.WithCancel(context.Background())
+	secondDone := make(chan error, 1)
+	go func() {
+		_, err := client.EmbedQuery(waitingCtx, "second")
+		secondDone <- err
+	}()
+	time.Sleep(10 * time.Millisecond)
+	cancel()
+	if err := <-secondDone; !errors.Is(err, context.Canceled) {
+		t.Fatalf("waiting query error = %v, want context.Canceled", err)
+	}
+	if requests.Load() != 1 {
+		t.Fatalf("HTTP requests = %d, canceled waiter should not send a request", requests.Load())
+	}
+	releaseFirst()
+	if err := <-firstDone; err != nil {
+		t.Fatalf("first query error = %v", err)
+	}
+}
+
 func TestEmbedPropagatesRequestTimeout(t *testing.T) {
 	t.Parallel()
 

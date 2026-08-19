@@ -69,6 +69,9 @@ Embedding 模型固定为 `qwen3-embedding:0.6b`，不通过配置覆盖；`embe
 | `GORAG_OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama 地址 |
 | `GORAG_OLLAMA_TIMEOUT` | `30s` | 单次 Ollama 调用超时 |
 | `GORAG_EMBEDDING_DIMENSION` | `1024` | 固定向量维度 |
+| `GORAG_EMBEDDING_BATCH_SIZE` | `16` | 每次 Ollama embedding 请求的最大文本数 |
+| `GORAG_EMBEDDING_MAX_CONCURRENCY` | `1` | 单进程内 embedding HTTP 请求的全局并发上限 |
+| `GORAG_INDEXING_DOCUMENT_CONCURRENCY` | `1` | `sync` 与 `reindex-all` 同时处理的文档数 |
 | `GORAG_DOCUMENTS_DIR` | `./docs` | 仅允许 Markdown/TXT 的资料目录 |
 | `GORAG_RETRIEVAL_TOP_K` | `10` | 精确检索候选数，范围 1–100 |
 | `GORAG_RETRIEVAL_MAX_CONTEXT` | `5` | 最终上下文 Chunk 上限，不得超过 Top K |
@@ -81,7 +84,7 @@ Embedding 模型固定为 `qwen3-embedding:0.6b`，不通过配置覆盖；`embe
 | `GORAG_STARTUP_CHECK_TIMEOUT` | `30s` | 启动依赖检查总时限 |
 | `GORAG_STARTUP_RETRY_INTERVAL` | `1s` | 启动检查重试间隔 |
 
-`server.read_header_timeout` 和 `server.shutdown_timeout` 也可分别由 `GORAG_SERVER_READ_HEADER_TIMEOUT`、`GORAG_SERVER_SHUTDOWN_TIMEOUT` 覆盖。不要把生产数据库密码或模型 API 密钥写入 `config.yaml`、命令行参数或日志。
+批大小和两个并发配置必须为正整数。默认均保持保守的单并发行为；调高文档并发时，embedding 请求仍受进程级 `GORAG_EMBEDDING_MAX_CONCURRENCY` 限制。`server.read_header_timeout` 和 `server.shutdown_timeout` 也可分别由 `GORAG_SERVER_READ_HEADER_TIMEOUT`、`GORAG_SERVER_SHUTDOWN_TIMEOUT` 覆盖。不要把生产数据库密码或模型 API 密钥写入 `config.yaml`、命令行参数或日志。
 
 ## 端到端评测
 

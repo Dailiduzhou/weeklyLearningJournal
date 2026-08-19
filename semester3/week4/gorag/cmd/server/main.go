@@ -53,6 +53,7 @@ func runApplication(ctx context.Context, logger *slog.Logger) error {
 	ollamaHTTPClient := &http.Client{Timeout: cfg.Ollama.Timeout}
 	embedder, err := embedding.NewClient(embedding.Config{
 		BaseURL: cfg.Ollama.BaseURL, Model: embedding.DefaultModel,
+		BatchSize: cfg.Embedding.BatchSize, MaxConcurrency: cfg.Embedding.MaxConcurrency,
 		RequestTimeout: cfg.Ollama.Timeout,
 	}, embedding.WithHTTPClient(ollamaHTTPClient))
 	if err != nil {

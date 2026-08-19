@@ -37,10 +37,15 @@ database:
 retrieval:
   top_k: 7
   similarity_threshold: 0.7
+embedding:
+  batch_size: 24
+indexing:
+  document_concurrency: 3
 `)
 	t.Setenv("GORAG_SERVER_ADDRESS", ":9191")
 	t.Setenv("GORAG_DATABASE_URL", "postgres://env-user:env-password@db.example:5432/gorag?sslmode=disable")
 	t.Setenv("GORAG_RETRIEVAL_TOP_K", "9")
+	t.Setenv("GORAG_EMBEDDING_MAX_CONCURRENCY", "4")
 	t.Setenv("GORAG_ANSWER_API_KEY", "secret-from-environment")
 
 	cfg, err := Load(path)
@@ -64,6 +69,12 @@ retrieval:
 	}
 	if cfg.Embedding.Dimension != EmbeddingDimension {
 		t.Fatalf("Embedding.Dimension = %d, want default %d", cfg.Embedding.Dimension, EmbeddingDimension)
+	}
+	if cfg.Embedding.BatchSize != 24 || cfg.Embedding.MaxConcurrency != 4 {
+		t.Fatalf("Embedding batching = %#v, want file batch size and environment concurrency", cfg.Embedding)
+	}
+	if cfg.Indexing.DocumentConcurrency != 3 {
+		t.Fatalf("Indexing.DocumentConcurrency = %d, want 3", cfg.Indexing.DocumentConcurrency)
 	}
 	if cfg.Server.ShutdownTimeout != 15*time.Second {
 		t.Fatalf("Server.ShutdownTimeout = %s, want default 15s", cfg.Server.ShutdownTimeout)
@@ -101,12 +112,32 @@ func TestLoadRejectsConflictingDimension(t *testing.T) {
 	}
 }
 
+func TestLoadRejectsNonPositiveBatchingConfiguration(t *testing.T) {
+	for _, testCase := range []struct {
+		name     string
+		contents string
+		want     string
+	}{
+		{name: "batch size", contents: "embedding:\n  batch_size: -1\n", want: "embedding.batch_size must be positive"},
+		{name: "embedding concurrency", contents: "embedding:\n  max_concurrency: -1\n", want: "embedding.max_concurrency must be positive"},
+		{name: "document concurrency", contents: "indexing:\n  document_concurrency: -1\n", want: "indexing.document_concurrency must be positive"},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			_, err := Load(writeConfig(t, testCase.contents))
+			if err == nil || !strings.Contains(err.Error(), testCase.want) {
+				t.Fatalf("Load() error = %v, want %q", err, testCase.want)
+			}
+		})
+	}
+}
+
 func TestValidateReturnsAllRelevantProblems(t *testing.T) {
 	cfg := Config{
 		Server:    ServerConfig{ReadHeaderTimeout: time.Second, ShutdownTimeout: time.Second},
 		Database:  DatabaseConfig{URL: "http://not-postgres.example"},
 		Ollama:    OllamaConfig{BaseURL: "localhost:11434", Timeout: time.Second},
-		Embedding: EmbeddingConfig{Dimension: EmbeddingDimension},
+		Embedding: EmbeddingConfig{Dimension: EmbeddingDimension, BatchSize: 16, MaxConcurrency: 1},
+		Indexing:  IndexingConfig{DocumentConcurrency: 1},
 		Retrieval: RetrievalConfig{TopK: 101, SimilarityThreshold: 2},
 		Answer:    AnswerConfig{Provider: "unknown", BaseURL: "http://localhost:11434", Timeout: time.Second},
 		Startup:   StartupConfig{CheckTimeout: time.Second, RetryInterval: 2 * time.Second},

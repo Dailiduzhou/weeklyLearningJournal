@@ -15,6 +15,11 @@ ollama:
 
 embedding:
   dimension: 1024
+  batch_size: 16
+  max_concurrency: 1
+
+indexing:
+  document_concurrency: 1
 
 documents:
   dir: "./docs"

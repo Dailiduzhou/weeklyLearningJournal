@@ -12,6 +12,7 @@ import (
 	"path"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"gorag/internal/document"
@@ -56,8 +57,9 @@ type Store interface {
 }
 
 type Config struct {
-	DocsRoot        string
-	FinalizeTimeout time.Duration
+	DocsRoot            string
+	DocumentConcurrency int
+	FinalizeTimeout     time.Duration
 }
 
 // Result summarizes one recorded lifecycle operation.
@@ -75,12 +77,13 @@ type Result struct {
 }
 
 type Indexer struct {
-	config   Config
-	loader   Loader
-	splitter Splitter
-	embedder Embedder
-	store    Store
-	version  func() (string, error)
+	config    Config
+	loader    Loader
+	splitter  Splitter
+	embedder  Embedder
+	store     Store
+	version   func() (string, error)
+	versionMu sync.Mutex
 }
 
 type Option func(*Indexer)
@@ -103,6 +106,12 @@ func New(config Config, loader Loader, splitter Splitter, embedder Embedder, sto
 	}
 	if config.FinalizeTimeout < 0 {
 		return nil, errors.New("indexer: finalize timeout must be positive")
+	}
+	if config.DocumentConcurrency == 0 {
+		config.DocumentConcurrency = 1
+	}
+	if config.DocumentConcurrency < 0 {
+		return nil, errors.New("indexer: document concurrency must be positive")
 	}
 	if loader == nil || splitter == nil || embedder == nil || store == nil {
 		return nil, errors.New("indexer: loader, splitter, embedder, and store are required")
@@ -138,22 +147,12 @@ func (i *Indexer) Sync(ctx context.Context) (Result, error) {
 		}
 
 		onDisk := make(map[string]struct{}, len(documents))
-		var failures []error
 		for _, doc := range documents {
-			if err := ctx.Err(); err != nil {
-				return errors.Join(append(failures, err)...)
-			}
 			onDisk[doc.SourcePath] = struct{}{}
-			outcome, chunks, err := i.indexDocument(ctx, doc, false)
-			result.Documents++
-			result.Chunks += chunks
-			if err != nil {
-				result.Failed++
-				result.FailurePaths = append(result.FailurePaths, doc.SourcePath)
-				failures = append(failures, fmt.Errorf("index %q: %w", doc.SourcePath, err))
-				continue
-			}
-			result.record(outcome)
+		}
+		failures := i.indexDocuments(ctx, documents, false, "index", result)
+		if err := ctx.Err(); err != nil {
+			return errors.Join(append(failures, err)...)
 		}
 
 		for _, record := range stored {
@@ -193,21 +192,9 @@ func (i *Indexer) ReindexAll(ctx context.Context) (Result, error) {
 		if err != nil {
 			return fmt.Errorf("scan docs root: %w", err)
 		}
-		var failures []error
-		for _, doc := range documents {
-			if err := ctx.Err(); err != nil {
-				return errors.Join(append(failures, err)...)
-			}
-			outcome, chunks, err := i.indexDocument(ctx, doc, true)
-			result.Documents++
-			result.Chunks += chunks
-			if err != nil {
-				result.Failed++
-				result.FailurePaths = append(result.FailurePaths, doc.SourcePath)
-				failures = append(failures, fmt.Errorf("reindex %q: %w", doc.SourcePath, err))
-				continue
-			}
-			result.record(outcome)
+		failures := i.indexDocuments(ctx, documents, true, "reindex", result)
+		if err := ctx.Err(); err != nil {
+			failures = append(failures, err)
 		}
 		return errors.Join(failures...)
 	})
@@ -285,6 +272,69 @@ func (r *Result) record(value outcome) {
 	}
 }
 
+type documentIndexResult struct {
+	attempted bool
+	outcome   outcome
+	chunks    int
+	err       error
+}
+
+// indexDocuments runs independent document lifecycles concurrently while
+// reducing their results in input order. The loader already sorts scanned
+// documents, so failure reporting stays deterministic regardless of completion
+// order.
+func (i *Indexer) indexDocuments(ctx context.Context, documents []document.Document, force bool, action string, result *Result) []error {
+	results := make([]documentIndexResult, len(documents))
+	if len(documents) == 0 {
+		return nil
+	}
+
+	jobs := make(chan int)
+	workerCount := min(i.config.DocumentConcurrency, len(documents))
+	var workers sync.WaitGroup
+	for range workerCount {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for index := range jobs {
+				if ctx.Err() != nil {
+					return
+				}
+				value, chunks, err := i.indexDocument(ctx, documents[index], force)
+				results[index] = documentIndexResult{attempted: true, outcome: value, chunks: chunks, err: err}
+			}
+		}()
+	}
+
+dispatch:
+	for index := range documents {
+		select {
+		case jobs <- index:
+		case <-ctx.Done():
+			break dispatch
+		}
+	}
+	close(jobs)
+	workers.Wait()
+
+	failures := make([]error, 0)
+	for index, value := range results {
+		if !value.attempted {
+			continue
+		}
+		result.Documents++
+		result.Chunks += value.chunks
+		if value.err != nil {
+			result.Failed++
+			result.FailurePaths = append(result.FailurePaths, documents[index].SourcePath)
+			failures = append(failures, fmt.Errorf("%s %q: %w", action, documents[index].SourcePath, value.err))
+			continue
+		}
+		result.record(value.outcome)
+	}
+	return failures
+}
+
 func (i *Indexer) indexDocument(ctx context.Context, doc document.Document, force bool) (outcome, int, error) {
 	if err := ctx.Err(); err != nil {
 		return outcomeSkipped, 0, err
@@ -300,7 +350,7 @@ func (i *Indexer) indexDocument(ctx context.Context, doc document.Document, forc
 		return outcomeSkipped, 0, nil
 	}
 
-	version, err := i.version()
+	version, err := i.nextVersion()
 	if err != nil {
 		return outcomeSkipped, 0, fmt.Errorf("allocate document version: %w", err)
 	}
@@ -360,6 +410,12 @@ func (i *Indexer) indexDocument(ctx context.Context, doc document.Document, forc
 		return outcomeAdded, len(storedChunks), nil
 	}
 	return outcomeUpdated, len(storedChunks), nil
+}
+
+func (i *Indexer) nextVersion() (string, error) {
+	i.versionMu.Lock()
+	defer i.versionMu.Unlock()
+	return i.version()
 }
 
 func (i *Indexer) withRun(ctx context.Context, runType string, work func(context.Context, *Result) error) (Result, error) {

@@ -28,6 +28,7 @@ type Config struct {
 	Database  DatabaseConfig  `mapstructure:"database"`
 	Ollama    OllamaConfig    `mapstructure:"ollama"`
 	Embedding EmbeddingConfig `mapstructure:"embedding"`
+	Indexing  IndexingConfig  `mapstructure:"indexing"`
 	Documents DocumentsConfig `mapstructure:"documents"`
 	Retrieval RetrievalConfig `mapstructure:"retrieval"`
 	Answer    AnswerConfig    `mapstructure:"answer"`
@@ -49,12 +50,16 @@ type OllamaConfig struct {
 	Timeout time.Duration `mapstructure:"timeout"`
 }
 
-// EmbeddingConfig only exposes the vector-dimension invariant. The embedding
-// model name is intentionally not configurable: document and query embeddings
-// must stay on the fixed qwen3-embedding:0.6b model, and repository/migration
-// constraints enforce that invariant.
+// EmbeddingConfig keeps the model invariant fixed while exposing bounded
+// batching controls shared by indexing and query embeddings.
 type EmbeddingConfig struct {
-	Dimension int `mapstructure:"dimension"`
+	Dimension      int `mapstructure:"dimension"`
+	BatchSize      int `mapstructure:"batch_size"`
+	MaxConcurrency int `mapstructure:"max_concurrency"`
+}
+
+type IndexingConfig struct {
+	DocumentConcurrency int `mapstructure:"document_concurrency"`
 }
 
 type DocumentsConfig struct {
@@ -89,6 +94,7 @@ func (c Config) LogValue() slog.Value {
 		slog.String("database_url", redactURL(c.Database.URL)),
 		slog.Any("ollama", c.Ollama),
 		slog.Any("embedding", c.Embedding),
+		slog.Any("indexing", c.Indexing),
 		slog.Any("documents", c.Documents),
 		slog.Any("retrieval", c.Retrieval),
 		slog.Group("answer",
@@ -161,6 +167,9 @@ func (c Config) Validate() error {
 	if c.Embedding.Dimension != EmbeddingDimension {
 		problems = append(problems, fmt.Errorf("embedding.dimension must be %d, got %d", EmbeddingDimension, c.Embedding.Dimension))
 	}
+	positiveInt(&problems, "embedding.batch_size", c.Embedding.BatchSize)
+	positiveInt(&problems, "embedding.max_concurrency", c.Embedding.MaxConcurrency)
+	positiveInt(&problems, "indexing.document_concurrency", c.Indexing.DocumentConcurrency)
 	if strings.TrimSpace(c.Documents.Dir) == "" {
 		problems = append(problems, errors.New("documents.dir must not be empty"))
 	}
@@ -239,6 +248,12 @@ func positiveDuration(problems *[]error, name string, value time.Duration) {
 	}
 }
 
+func positiveInt(problems *[]error, name string, value int) {
+	if value <= 0 {
+		*problems = append(*problems, fmt.Errorf("%s must be positive, got %d", name, value))
+	}
+}
+
 var configurationKeys = []string{
 	"server.address",
 	"server.read_header_timeout",
@@ -247,6 +262,9 @@ var configurationKeys = []string{
 	"ollama.base_url",
 	"ollama.timeout",
 	"embedding.dimension",
+	"embedding.batch_size",
+	"embedding.max_concurrency",
+	"indexing.document_concurrency",
 	"documents.dir",
 	"retrieval.top_k",
 	"retrieval.max_context",
@@ -268,6 +286,9 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("ollama.base_url", "http://localhost:11434")
 	v.SetDefault("ollama.timeout", "30s")
 	v.SetDefault("embedding.dimension", EmbeddingDimension)
+	v.SetDefault("embedding.batch_size", 16)
+	v.SetDefault("embedding.max_concurrency", 1)
+	v.SetDefault("indexing.document_concurrency", 1)
 	v.SetDefault("documents.dir", "./docs")
 	v.SetDefault("retrieval.top_k", 10)
 	v.SetDefault("retrieval.max_context", 5)

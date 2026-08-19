@@ -90,6 +90,7 @@ type Client struct {
 	queryInstruction string
 	httpClient       *http.Client
 	wait             func(context.Context, time.Duration) error
+	requestSlots     chan struct{}
 }
 
 func NewClient(config Config, options ...Option) (*Client, error) {
@@ -151,6 +152,7 @@ func NewClient(config Config, options ...Option) (*Client, error) {
 		queryInstruction: config.QueryInstruction,
 		httpClient:       &http.Client{},
 		wait:             waitContext,
+		requestSlots:     make(chan struct{}, config.MaxConcurrency),
 	}
 	for _, option := range options {
 		option(client)
@@ -274,7 +276,7 @@ func (c *Client) embedBatch(ctx context.Context, inputs []string) ([][]float32, 
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		vectors, retry, err := c.doEmbed(ctx, payload, len(inputs))
+		vectors, retry, err := c.doEmbedLimited(ctx, payload, len(inputs))
 		if err == nil {
 			return vectors, nil
 		}
@@ -287,6 +289,20 @@ func (c *Client) embedBatch(ctx context.Context, inputs []string) ([][]float32, 
 		}
 	}
 	return nil, fmt.Errorf("Ollama embed failed after at most %d retries: %w", c.maxRetries, lastErr)
+}
+
+// doEmbedLimited applies one process-local limit across every request made by
+// this client, including concurrent document batches and query embeddings.
+// Retry backoff deliberately happens outside the slot so healthy work can
+// continue while a failed request waits.
+func (c *Client) doEmbedLimited(ctx context.Context, payload []byte, expected int) ([][]float32, bool, error) {
+	select {
+	case c.requestSlots <- struct{}{}:
+		defer func() { <-c.requestSlots }()
+	case <-ctx.Done():
+		return nil, false, ctx.Err()
+	}
+	return c.doEmbed(ctx, payload, expected)
 }
 
 func (c *Client) doEmbed(ctx context.Context, payload []byte, expected int) ([][]float32, bool, error) {
