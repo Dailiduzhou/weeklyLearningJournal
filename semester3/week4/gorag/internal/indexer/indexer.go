@@ -56,6 +56,15 @@ type Store interface {
 	FailIndexRun(context.Context, int64, int, int, error) error
 }
 
+// ChunkSink is an optional secondary index (e.g., the bluge BM25 index)
+// mirrored after the repository. It receives every activated chunk version
+// and every document deletion. Implementations must be safe for the indexer's
+// configured document concurrency.
+type ChunkSink interface {
+	IndexChunks(ctx context.Context, documentID, version string, chunks []document.Chunk) error
+	DeleteDocument(ctx context.Context, documentID string) error
+}
+
 type Config struct {
 	DocsRoot            string
 	DocumentConcurrency int
@@ -82,6 +91,7 @@ type Indexer struct {
 	splitter  Splitter
 	embedder  Embedder
 	store     Store
+	chunkSink ChunkSink
 	version   func() (string, error)
 	versionMu sync.Mutex
 }
@@ -93,6 +103,16 @@ func WithVersionGenerator(generator func() (string, error)) Option {
 	return func(indexer *Indexer) {
 		if generator != nil {
 			indexer.version = generator
+		}
+	}
+}
+
+// WithChunkSink attaches an optional secondary index. A nil sink disables
+// mirroring and keeps the repository the only store.
+func WithChunkSink(sink ChunkSink) Option {
+	return func(indexer *Indexer) {
+		if sink != nil {
+			indexer.chunkSink = sink
 		}
 	}
 }
@@ -169,6 +189,12 @@ func (i *Indexer) Sync(ctx context.Context) (Result, error) {
 				failures = append(failures, fmt.Errorf("delete missing %q: %w", record.SourcePath, err))
 				continue
 			}
+			if err := i.deleteFromChunkSink(ctx, record.ID); err != nil {
+				result.Failed++
+				result.FailurePaths = append(result.FailurePaths, record.SourcePath)
+				failures = append(failures, fmt.Errorf("delete missing %q from chunk sink: %w", record.SourcePath, err))
+				continue
+			}
 			result.Deleted++
 		}
 		return errors.Join(failures...)
@@ -222,6 +248,11 @@ func (i *Indexer) DeleteFile(ctx context.Context, target string) (Result, error)
 			result.Failed = 1
 			result.FailurePaths = []string{sourcePath}
 			return fmt.Errorf("mark document %q deleted: %w", sourcePath, err)
+		}
+		if err := i.deleteFromChunkSink(ctx, record.ID); err != nil {
+			result.Failed = 1
+			result.FailurePaths = []string{sourcePath}
+			return fmt.Errorf("delete document %q from chunk sink: %w", sourcePath, err)
 		}
 		result.Deleted = 1
 		return nil
@@ -406,10 +437,25 @@ func (i *Indexer) indexDocument(ctx context.Context, doc document.Document, forc
 	if _, err := i.store.DeleteInactiveVersions(ctx, record.ID); err != nil {
 		return outcomeSkipped, len(storedChunks), fmt.Errorf("clean inactive versions: %w", err)
 	}
+	if i.chunkSink != nil {
+		if err := i.chunkSink.IndexChunks(ctx, strconv.FormatInt(record.ID, 10), version, chunks); err != nil {
+			return outcomeSkipped, len(storedChunks), fmt.Errorf("mirror chunk version %q into chunk sink: %w", version, err)
+		}
+	}
 	if created || record.CurrentVersion == nil {
 		return outcomeAdded, len(storedChunks), nil
 	}
 	return outcomeUpdated, len(storedChunks), nil
+}
+
+func (i *Indexer) deleteFromChunkSink(ctx context.Context, documentID int64) error {
+	if i.chunkSink == nil {
+		return nil
+	}
+	if err := i.chunkSink.DeleteDocument(ctx, strconv.FormatInt(documentID, 10)); err != nil {
+		return fmt.Errorf("chunk sink delete document %d: %w", documentID, err)
+	}
+	return nil
 }
 
 func (i *Indexer) nextVersion() (string, error) {

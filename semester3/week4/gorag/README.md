@@ -76,6 +76,10 @@ Embedding 模型固定为 `qwen3-embedding:0.6b`，不通过配置覆盖；`embe
 | `GORAG_RETRIEVAL_TOP_K` | `10` | 精确检索候选数，范围 1–100 |
 | `GORAG_RETRIEVAL_MAX_CONTEXT` | `5` | 最终上下文 Chunk 上限，不得超过 Top K |
 | `GORAG_RETRIEVAL_SIMILARITY_THRESHOLD` | `0.5` | 相似度阈值，范围 -1–1 |
+| `GORAG_RETRIEVAL_VECTOR_ENABLED` | `true` | 是否启用 pgvector 向量检索 |
+| `GORAG_RETRIEVAL_BM25_ENABLED` | `false` | 是否启用 bluge BM25 词法检索 |
+| `GORAG_RETRIEVAL_BM25_INDEX_PATH` | `./data/bm25` | BM25 索引目录；启用 BM25 时必填 |
+| `GORAG_RETRIEVAL_BM25_MIN_SCORE` | `0` | BM25 最低得分（原始 BM25 分，非余弦相似度） |
 | `GORAG_ANSWER_PROVIDER` | `ollama` | `ollama` 或 `openai-compatible` |
 | `GORAG_ANSWER_BASE_URL` | `http://localhost:11434` | 回答模型 API 地址 |
 | `GORAG_ANSWER_MODEL` | `qwen3:4b` | 回答模型名称 |
@@ -85,6 +89,17 @@ Embedding 模型固定为 `qwen3-embedding:0.6b`，不通过配置覆盖；`embe
 | `GORAG_STARTUP_RETRY_INTERVAL` | `1s` | 启动检查重试间隔 |
 
 批大小和两个并发配置必须为正整数。默认均保持保守的单并发行为；调高文档并发时，embedding 请求仍受进程级 `GORAG_EMBEDDING_MAX_CONCURRENCY` 限制。`server.read_header_timeout` 和 `server.shutdown_timeout` 也可分别由 `GORAG_SERVER_READ_HEADER_TIMEOUT`、`GORAG_SERVER_SHUTDOWN_TIMEOUT` 覆盖。不要把生产数据库密码或模型 API 密钥写入 `config.yaml`、命令行参数或日志。
+
+### 检索方式开关
+
+向量检索（pgvector 余弦）和 BM25 检索（bluge 词法索引）互相平行，可独立开关：
+
+- 只开向量（默认）：`retrieval.vector.enabled: true`、`retrieval.bm25.enabled: false`，查询时嵌入问题并执行 pgvector 精确余弦搜索。
+- 只开 BM25：`retrieval.vector.enabled: false`、`retrieval.bm25.enabled: true`，查询走本地 bluge 索引，无需嵌入问题；索引器仍会写向量列，但查询侧不再依赖 Ollama。
+- 两者都开：两个检索器并行执行，结果用倒数排名融合（RRF，k=60）合并，融合得分作为文档分数参与后续上下文选择。
+- 两者都关：配置校验失败，服务拒绝启动。
+
+启用 BM25 后，`indexer` 会在每次激活文档版本时把 Chunk 镜像写入 `retrieval.bm25.index_path` 指向的目录，删除文档时同步清理，因此 BM25 索引始终与数据库当前版本一致。若先开启 BM25，需要重新执行一次 `indexer reindex-all` 来补建词法索引。
 
 ## 端到端评测
 

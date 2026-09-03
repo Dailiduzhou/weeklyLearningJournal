@@ -12,10 +12,12 @@ import (
 	"syscall"
 	"time"
 
+	einoretriever "github.com/cloudwego/eino/components/retriever"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	pgxvector "github.com/pgvector/pgvector-go/pgx"
 
+	"gorag/internal/bm25"
 	"gorag/internal/config"
 	"gorag/internal/embedding"
 	"gorag/internal/rag"
@@ -23,6 +25,12 @@ import (
 	"gorag/internal/retriever"
 	"gorag/internal/transport"
 )
+
+// SearchStore is the vector-search boundary of repository.Repository needed
+// by the online retriever.
+type SearchStore interface {
+	Search(ctx context.Context, queryVector []float32, limit int) ([]repository.SearchResult, error)
+}
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
@@ -59,12 +67,11 @@ func runApplication(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return fmt.Errorf("construct embedding client: %w", err)
 	}
-	vectorRetriever, err := retriever.NewPgVectorRetriever(embedder, repositoryStore, retriever.Config{
-		CandidateTopK: cfg.Retrieval.TopK, SimilarityThreshold: cfg.Retrieval.SimilarityThreshold,
-	})
+	onlineRetriever, closeBM25, err := buildRetriever(cfg, embedder, repositoryStore)
 	if err != nil {
 		return fmt.Errorf("construct retriever: %w", err)
 	}
+	defer closeBM25()
 	contextBuilder, err := rag.NewContextBuilder(cfg.Retrieval.MaxContext)
 	if err != nil {
 		return fmt.Errorf("construct context builder: %w", err)
@@ -74,7 +81,7 @@ func runApplication(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	chain, err := rag.NewChain(startupCtx, vectorRetriever, contextBuilder, nil, chatModel)
+	chain, err := rag.NewChain(startupCtx, onlineRetriever, contextBuilder, nil, chatModel)
 	if err != nil {
 		return fmt.Errorf("construct RAG chain: %w", err)
 	}
@@ -82,8 +89,12 @@ func runApplication(ctx context.Context, logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	var queryEmbedder embedding.Embedder
+	if cfg.Retrieval.Vector.Enabled {
+		queryEmbedder = embedder
+	}
 	checker, err := newDependencyChecker(database, ollamaHTTPClient, answerHTTPClient,
-		cfg.Ollama.BaseURL, cfg.Answer.BaseURL, embedder, embedding.DefaultModel,
+		cfg.Ollama.BaseURL, cfg.Answer.BaseURL, queryEmbedder, embedding.DefaultModel,
 		cfg.Answer.Provider, cfg.Answer.Model, cfg.Answer.APIKey, cfg.Embedding.Dimension)
 	if err != nil {
 		return err
@@ -125,6 +136,54 @@ func openDatabase(ctx context.Context, connectionString string) (*pgxpool.Pool, 
 		return nil, fmt.Errorf("open database pool: %w", err)
 	}
 	return pool, nil
+}
+
+func buildRetriever(cfg config.Config, embedder *embedding.Client, store SearchStore) (einoretriever.Retriever, func(), error) {
+	noClose := func() {}
+	vectorEnabled := cfg.Retrieval.Vector.Enabled
+	bm25Enabled := cfg.Retrieval.BM25.Enabled
+
+	var vectorRetriever *retriever.PgVectorRetriever
+	if vectorEnabled {
+		var err error
+		vectorRetriever, err = retriever.NewPgVectorRetriever(embedder, store, retriever.Config{
+			CandidateTopK: cfg.Retrieval.TopK, SimilarityThreshold: cfg.Retrieval.SimilarityThreshold,
+		})
+		if err != nil {
+			return nil, noClose, fmt.Errorf("construct vector retriever: %w", err)
+		}
+	}
+
+	var bm25Retriever *retriever.BM25Retriever
+	closeBM25 := noClose
+	if bm25Enabled {
+		index, err := bm25.Open(cfg.Retrieval.BM25.IndexPath)
+		if err != nil {
+			return nil, noClose, fmt.Errorf("open bm25 index: %w", err)
+		}
+		closeBM25 = func() { _ = index.Close() }
+		bm25Retriever, err = retriever.NewBM25Retriever(index, retriever.Config{
+			CandidateTopK: cfg.Retrieval.TopK, SimilarityThreshold: cfg.Retrieval.BM25.MinScore,
+		})
+		if err != nil {
+			return nil, closeBM25, fmt.Errorf("construct bm25 retriever: %w", err)
+		}
+	}
+
+	switch {
+	case vectorEnabled && bm25Enabled:
+		fused, err := retriever.NewFusionRetriever(cfg.Retrieval.TopK, retriever.DefaultFusionK, vectorRetriever, bm25Retriever)
+		if err != nil {
+			return nil, closeBM25, fmt.Errorf("construct fusion retriever: %w", err)
+		}
+		return fused, closeBM25, nil
+	case vectorEnabled:
+		return vectorRetriever, closeBM25, nil
+	case bm25Enabled:
+		return bm25Retriever, closeBM25, nil
+	default:
+		return nil, closeBM25, errors.New("at least one of retrieval.vector.enabled or retrieval.bm25.enabled must be true")
+	}
 }
 
 func serve(ctx context.Context, server *http.Server, listener net.Listener, shutdownTimeout time.Duration) error {

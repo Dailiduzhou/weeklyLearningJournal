@@ -83,6 +83,10 @@ services:
       GORAG_RETRIEVAL_TOP_K: ${GORAG_RETRIEVAL_TOP_K:-10}
       GORAG_RETRIEVAL_MAX_CONTEXT: ${GORAG_RETRIEVAL_MAX_CONTEXT:-5}
       GORAG_RETRIEVAL_SIMILARITY_THRESHOLD: ${GORAG_RETRIEVAL_SIMILARITY_THRESHOLD:-0.5}
+      GORAG_RETRIEVAL_VECTOR_ENABLED: ${GORAG_RETRIEVAL_VECTOR_ENABLED:-true}
+      GORAG_RETRIEVAL_BM25_ENABLED: ${GORAG_RETRIEVAL_BM25_ENABLED:-false}
+      GORAG_RETRIEVAL_BM25_INDEX_PATH: ${GORAG_RETRIEVAL_BM25_INDEX_PATH:-/app/data/bm25}
+      GORAG_RETRIEVAL_BM25_MIN_SCORE: ${GORAG_RETRIEVAL_BM25_MIN_SCORE:-0}
       GORAG_ANSWER_PROVIDER: ${GORAG_ANSWER_PROVIDER:-ollama}
       GORAG_ANSWER_BASE_URL: ${GORAG_ANSWER_BASE_URL:-http://ollama:11434}
       GORAG_ANSWER_MODEL: ${GORAG_ANSWER_MODEL:-qwen3:4b}
@@ -95,6 +99,7 @@ services:
     volumes:
       - ./config.yaml:/app/config.yaml:ro
       - ./docs:/app/docs:ro
+      - bm25-data:/app/data
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -120,6 +125,7 @@ services:
     volumes:
       - ./config.yaml:/app/config.yaml:ro
       - ./docs:/app/docs:ro
+      - bm25-data:/app/data
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -130,3 +136,4 @@ services:
 volumes:
   postgres-data:
   ollama-data:
+  bm25-data:

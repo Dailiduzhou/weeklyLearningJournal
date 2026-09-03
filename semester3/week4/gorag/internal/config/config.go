@@ -67,9 +67,25 @@ type DocumentsConfig struct {
 }
 
 type RetrievalConfig struct {
-	TopK                int     `mapstructure:"top_k"`
-	MaxContext          int     `mapstructure:"max_context"`
-	SimilarityThreshold float64 `mapstructure:"similarity_threshold"`
+	TopK                int          `mapstructure:"top_k"`
+	MaxContext          int          `mapstructure:"max_context"`
+	SimilarityThreshold float64      `mapstructure:"similarity_threshold"`
+	Vector              VectorConfig `mapstructure:"vector"`
+	BM25                BM25Config   `mapstructure:"bm25"`
+}
+
+// VectorConfig toggles the pgvector cosine retriever.
+type VectorConfig struct {
+	Enabled bool `mapstructure:"enabled"`
+}
+
+// BM25Config toggles the bluge lexical retriever and locates its on-disk
+// index. MinScore filters weak lexical matches; scores are raw BM25 values,
+// not comparable to cosine similarity.
+type BM25Config struct {
+	Enabled   bool    `mapstructure:"enabled"`
+	IndexPath string  `mapstructure:"index_path"`
+	MinScore  float64 `mapstructure:"min_score"`
 }
 
 type AnswerConfig struct {
@@ -182,6 +198,17 @@ func (c Config) Validate() error {
 	if c.Retrieval.SimilarityThreshold < -1 || c.Retrieval.SimilarityThreshold > 1 {
 		problems = append(problems, fmt.Errorf("retrieval.similarity_threshold must be between -1 and 1, got %v", c.Retrieval.SimilarityThreshold))
 	}
+	if !c.Retrieval.Vector.Enabled && !c.Retrieval.BM25.Enabled {
+		problems = append(problems, errors.New("at least one of retrieval.vector.enabled or retrieval.bm25.enabled must be true"))
+	}
+	if c.Retrieval.BM25.Enabled {
+		if strings.TrimSpace(c.Retrieval.BM25.IndexPath) == "" {
+			problems = append(problems, errors.New("retrieval.bm25.index_path must not be empty when BM25 retrieval is enabled"))
+		}
+		if c.Retrieval.BM25.MinScore < 0 {
+			problems = append(problems, fmt.Errorf("retrieval.bm25.min_score must not be negative, got %v", c.Retrieval.BM25.MinScore))
+		}
+	}
 
 	switch c.Answer.Provider {
 	case "ollama", "openai-compatible":
@@ -269,6 +296,10 @@ var configurationKeys = []string{
 	"retrieval.top_k",
 	"retrieval.max_context",
 	"retrieval.similarity_threshold",
+	"retrieval.vector.enabled",
+	"retrieval.bm25.enabled",
+	"retrieval.bm25.index_path",
+	"retrieval.bm25.min_score",
 	"answer.provider",
 	"answer.base_url",
 	"answer.model",
@@ -293,6 +324,10 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("retrieval.top_k", 10)
 	v.SetDefault("retrieval.max_context", 5)
 	v.SetDefault("retrieval.similarity_threshold", 0.5)
+	v.SetDefault("retrieval.vector.enabled", true)
+	v.SetDefault("retrieval.bm25.enabled", false)
+	v.SetDefault("retrieval.bm25.index_path", "./data/bm25")
+	v.SetDefault("retrieval.bm25.min_score", 0.0)
 	v.SetDefault("answer.provider", "ollama")
 	v.SetDefault("answer.base_url", "http://localhost:11434")
 	v.SetDefault("answer.model", "qwen3:4b")

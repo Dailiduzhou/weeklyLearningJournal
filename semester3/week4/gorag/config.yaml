@@ -28,6 +28,12 @@ retrieval:
   top_k: 10
   max_context: 5
   similarity_threshold: 0.5
+  vector:
+    enabled: true
+  bm25:
+    enabled: false
+    index_path: "./data/bm25"
+    min_score: 0
 
 answer:
   provider: "ollama"

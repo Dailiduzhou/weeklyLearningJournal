@@ -61,6 +61,11 @@ type QueryEmbedder interface {
 	EmbedQuery(context.Context, string) ([]float32, error)
 }
 
+// repositorySearchResult is the shared hit shape used by both backends: the
+// vector searcher returns repository.SearchResult directly, while the BM25
+// searcher adapts bm25.SearchResult into the same fields.
+type repositorySearchResult = repository.SearchResult
+
 // Searcher is implemented by repository.Repository. Its contract requires
 // active documents at their current version only.
 type Searcher interface {

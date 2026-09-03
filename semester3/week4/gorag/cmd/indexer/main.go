@@ -12,6 +12,7 @@ import (
 	"strings"
 	"syscall"
 
+	"gorag/internal/bm25"
 	"gorag/internal/config"
 	"gorag/internal/document/loader"
 	"gorag/internal/document/splitter"
@@ -86,9 +87,19 @@ func run(ctx context.Context, args []string, logger *slog.Logger, stderr io.Writ
 	}
 	defer store.Close()
 
+	usecaseOptions := make([]indexerusecase.Option, 0, 1)
+	if cfg.Retrieval.BM25.Enabled {
+		bm25Index, err := bm25.Open(cfg.Retrieval.BM25.IndexPath)
+		if err != nil {
+			logger.Error("open bm25 index", "path", cfg.Retrieval.BM25.IndexPath, "error", err)
+			return 1
+		}
+		defer bm25Index.Close()
+		usecaseOptions = append(usecaseOptions, indexerusecase.WithChunkSink(bm25Index))
+	}
 	usecase, err := indexerusecase.New(indexerusecase.Config{
 		DocsRoot: cfg.Documents.Dir, DocumentConcurrency: cfg.Indexing.DocumentConcurrency,
-	}, documentLoader, documentSplitter, embedder, store)
+	}, documentLoader, documentSplitter, embedder, store, usecaseOptions...)
 	if err != nil {
 		logger.Error("create indexer", "error", err)
 		return 1

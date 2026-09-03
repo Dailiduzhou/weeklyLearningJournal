@@ -44,6 +44,9 @@ type dependencyChecker struct {
 	expectedDimension int
 }
 
+// newDependencyChecker validates startup dependencies. The embedder probe is
+// optional: pass nil when vector retrieval is disabled and only BM25 answers
+// the query side, which skips every Ollama-embedding readiness check.
 func newDependencyChecker(database databaseChecker, ollamaClient, answerClient *http.Client, ollamaBaseURL, answerBaseURL string, embedder embeddingProbe, embeddingModel, answerProvider, answerModel, answerAPIKey string, dimension int) (*dependencyChecker, error) {
 	baseURL, err := url.Parse(ollamaBaseURL)
 	if err != nil || baseURL.Scheme == "" || baseURL.Host == "" {
@@ -59,7 +62,7 @@ func newDependencyChecker(database databaseChecker, ollamaClient, answerClient *
 	if answerClient == nil {
 		answerClient = http.DefaultClient
 	}
-	if database == nil || embedder == nil || dimension <= 0 {
+	if database == nil || dimension <= 0 {
 		return nil, errors.New("server: readiness dependencies are incomplete")
 	}
 	return &dependencyChecker{
@@ -77,6 +80,10 @@ func (c *dependencyChecker) Check(ctx context.Context) error {
 	}
 	if err := c.database.Ping(ctx); err != nil {
 		return fmt.Errorf("PostgreSQL ping: %w", err)
+	}
+	if c.embedder == nil {
+		// Vector retrieval is disabled; only the answer model remains to check.
+		return c.checkAnswerModel(ctx)
 	}
 	var vectorInstalled bool
 	if err := c.database.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')`).Scan(&vectorInstalled); err != nil {
@@ -136,6 +143,29 @@ func (c *dependencyChecker) Check(ctx context.Context) error {
 	}
 	if len(vector) != c.expectedDimension {
 		return fmt.Errorf("Ollama embedding dimension is %d, want %d", len(vector), c.expectedDimension)
+	}
+	return nil
+}
+
+// checkAnswerModel validates answer-model availability without any
+// embedding-specific checks.
+func (c *dependencyChecker) checkAnswerModel(ctx context.Context) error {
+	if c.answerProvider == "ollama" {
+		models, err := c.ollamaModels(ctx)
+		if err != nil {
+			return err
+		}
+		if !modelsContain(models, c.answerModel) {
+			return fmt.Errorf("Ollama answer model %q is unavailable", c.answerModel)
+		}
+		return nil
+	}
+	answerModels, err := c.openAICompatibleModels(ctx)
+	if err != nil {
+		return err
+	}
+	if !modelsContain(answerModels, c.answerModel) {
+		return fmt.Errorf("OpenAI-compatible answer model %q is unavailable", c.answerModel)
 	}
 	return nil
 }

@@ -1,3 +1,6 @@
 docs/*
 .env
 .codegraph
+
+# BM25 lexical index
+/data/
