@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title }} · 注册</title>
+  <style>
+    :root {
+      --bg: #f5f6fb; --card: #fff; --ink: #1f2430; --muted: #6b7280; --line: #e5e7eb;
+      --brand: #3b5bdb; --ok: #0f766e; --ok-bg: #ecfdf5; --err: #b91c1c; --err-bg: #fef2f2;
+      --code-bg: #0f172a; --code-ink: #e2e8f0;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.6;
+      font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    code { font-family: var(--mono); font-size: .9em; background: #eef1f8; padding: 1px 5px; border-radius: 4px; }
+    .top { background: linear-gradient(135deg, #24306e, #3b5bdb); color: #fff; padding: 22px 0; }
+    .top h1 { margin: 0 0 4px; font-size: 22px; }
+    .top p { margin: 0; opacity: .85; font-size: 13.5px; }
+    .top code { background: rgba(255,255,255,.15); color: #fff; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+    main.wrap { padding-top: 22px; padding-bottom: 60px; display: grid; gap: 18px; grid-template-columns: 1fr; align-items: start; }
+    @media (min-width: 940px) { main.wrap { grid-template-columns: minmax(320px, 380px) 1fr; } }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px 20px;
+      box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+    .card h2 { margin: 0 0 8px; font-size: 16px; }
+    .card h3 { margin: 14px 0 6px; font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+    .hint { font-size: 13px; color: var(--muted); margin: 0 0 16px; }
+    .field { display: block; margin-bottom: 12px; }
+    .field > span { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+    .field em { font-style: normal; font-weight: 400; color: var(--muted); font-family: var(--mono); font-size: 11.5px; }
+    input[type="text"], input[type="password"] { width: 100%; padding: 9px 11px; font-size: 14px; color: var(--ink);
+      border: 1px solid #cfd4e2; border-radius: 8px; background: #fcfcff; }
+    input:focus { outline: 2px solid #b9c6f7; border-color: var(--brand); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+    .btn { appearance: none; border: 1px solid var(--brand); background: var(--brand); color: #fff; padding: 9px 16px;
+      border-radius: 8px; font-size: 14px; cursor: pointer; text-decoration: none; display: inline-block; }
+    .btn:hover { filter: brightness(1.06); }
+    .btn.ghost { background: #fff; color: var(--brand); }
+    .btn.small { padding: 6px 12px; font-size: 13px; }
+    pre { margin: 0; background: var(--code-bg); color: var(--code-ink); border-radius: 8px; padding: 12px 14px;
+      overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-break: break-all; }
+    .line { font-family: var(--mono); font-size: 13px; background: #eef1f8; border: 1px solid var(--line);
+      border-radius: 8px; padding: 9px 12px; }
+    .method { font-weight: 700; color: #1d4ed8; }
+    .badge { display: inline-block; font-family: var(--mono); font-size: 12.5px; font-weight: 700; padding: 3px 10px;
+      border-radius: 999px; background: #eef1f8; color: var(--muted); border: 1px solid var(--line); }
+    .badge.ok { background: var(--ok-bg); color: var(--ok); border-color: #a7f3d0; }
+    .badge.err { background: var(--err-bg); color: var(--err); border-color: #fecaca; }
+    .badge.wait { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+    .result { border-radius: 10px; padding: 12px 14px; font-size: 13.5px; margin-top: 12px; display: none; }
+    .result.ok { display: block; background: var(--ok-bg); border: 1px solid #a7f3d0; color: #0b5f59; }
+    .result.err { display: block; background: var(--err-bg); border: 1px solid #fecaca; color: #8f1d1d; }
+    .links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    .note { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <h1>{{ title }}</h1>
+      <p>POST <code>/api/users</code> · 服务端用 bcrypt 加密密码后写入 users 表</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <h2>① 注册表单</h2>
+      <p class="hint">提交后展示真实请求与响应，成功后<strong>不自动跳转</strong>。</p>
+      <form id="regForm" action="/api/users" method="post">
+        <label class="field">
+          <span>用户名 <em>username</em></span>
+          <input id="username" name="username" type="text" autocomplete="username" required />
+        </label>
+        <label class="field">
+          <span>密码 <em>password</em></span>
+          <input id="password" name="password" type="password" autocomplete="new-password" required />
+        </label>
+        <label class="field">
+          <span>姓名 <em>name</em></span>
+          <input id="name" name="name" type="text" required />
+        </label>
+        <div class="actions">
+          <button class="btn" type="submit">发送 POST /api/users</button>
+          <a class="btn ghost" href="/api/users/login">已有账号，去登录 →</a>
+        </div>
+      </form>
+      <div class="result" id="result"></div>
+    </section>
+
+    <section class="card">
+      <h2>② 请求 Preview</h2>
+      <div class="line"><span class="method">POST</span> /api/users HTTP/1.1</div>
+      <h3>请求头 Headers</h3>
+      <pre id="reqHeaders">—</pre>
+      <h3>请求体 Body</h3>
+      <pre id="reqBody">—</pre>
+      <h3>响应</h3>
+      <div><span class="badge wait" id="resStatus">等待提交…</span></div>
+      <pre id="resBody" style="margin-top:10px">—</pre>
+      <div class="note">成功时服务端返回 <code>201 Created</code> 与 <code>{username, name}</code>；用户名重复或数据库异常返回 500。</div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+      var form = document.getElementById("regForm");
+      var ACTION = form.getAttribute("action");
+      var reqBody = document.getElementById("reqBody");
+      var reqHeaders = document.getElementById("reqHeaders");
+      var resStatus = document.getElementById("resStatus");
+      var resBody = document.getElementById("resBody");
+      var result = document.getElementById("result");
+
+      function values() {
+        return {
+          username: document.getElementById("username").value,
+          password: document.getElementById("password").value,
+          name: document.getElementById("name").value
+        };
+      }
+      function encode(v) {
+        var p = new URLSearchParams();
+        p.set("username", v.username);
+        p.set("password", v.password);
+        p.set("name", v.name);
+        return p;
+      }
+      function renderRequest() {
+        var raw = encode(values()).toString();
+        reqHeaders.textContent = [
+          "Host: " + location.host,
+          "Content-Type: application/x-www-form-urlencoded",
+          "Content-Length: " + new Blob([raw]).size,
+          "Accept: application/json"
+        ].join("\n");
+        reqBody.textContent = raw.replace(/(password=)[^&]*/, function (m, p1) {
+          return p1 + new Array(document.getElementById("password").value.length + 1).join("\u2022");
+        });
+      }
+      function setStatus(t, c) { resStatus.textContent = t; resStatus.className = "badge " + c; }
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var raw = encode(values()).toString();
+        setStatus("发送中…", "wait");
+        result.className = "result";
+        fetch(ACTION, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" },
+          body: raw
+        }).then(function (res) {
+          return res.text().then(function (text) {
+            setStatus(res.status + " " + res.statusText, res.ok ? "ok" : "err");
+            try { resBody.textContent = JSON.stringify(JSON.parse(text), null, 2); }
+            catch (err) { resBody.textContent = text; }
+            if (res.ok) {
+              result.className = "result ok";
+              result.innerHTML = "<strong>注册成功（201 Created），页面不跳转。</strong>" +
+                "密码已在服务端用 bcrypt 哈希后入库，明文不会落库。可以点击左侧「去登录」继续演示登录请求。";
+            } else {
+              var msg = "";
+              try { msg = JSON.parse(text).error || text; } catch (err) { msg = text; }
+              result.className = "result err";
+              result.innerHTML = "<strong>注册失败（" + res.status + "）</strong>" + String(msg).replace(/[<>&]/g, "");
+            }
+          });
+        });
+      });
+
+      ["input", "change"].forEach(function (evt) { form.addEventListener(evt, renderRequest); });
+      renderRequest();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>修改资料</title>
+  <style>
+    :root {
+      --bg: #f5f6fb; --card: #fff; --ink: #1f2430; --muted: #6b7280; --line: #e5e7eb;
+      --brand: #3b5bdb; --ok: #0f766e; --ok-bg: #ecfdf5; --err: #b91c1c; --err-bg: #fef2f2;
+      --code-bg: #0f172a; --code-ink: #e2e8f0;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.6;
+      font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+    code { font-family: var(--mono); font-size: .9em; background: #eef1f8; padding: 1px 5px; border-radius: 4px; }
+    .top { background: linear-gradient(135deg, #24306e, #3b5bdb); color: #fff; padding: 22px 0; }
+    .top h1 { margin: 0 0 4px; font-size: 22px; }
+    .top p { margin: 0; opacity: .85; font-size: 13.5px; }
+    .top code { background: rgba(255,255,255,.15); color: #fff; }
+    .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+    main.wrap { padding-top: 22px; padding-bottom: 60px; display: grid; gap: 18px; grid-template-columns: 1fr; align-items: start; }
+    @media (min-width: 940px) { main.wrap { grid-template-columns: minmax(320px, 380px) 1fr; } }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px 20px;
+      box-shadow: 0 1px 2px rgba(16,24,40,.04); }
+    .card h2 { margin: 0 0 8px; font-size: 16px; }
+    .card h3 { margin: 14px 0 6px; font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+    .hint { font-size: 13px; color: var(--muted); margin: 0 0 16px; }
+    .field { display: block; margin-bottom: 12px; }
+    .field > span { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+    .field em { font-style: normal; font-weight: 400; color: var(--muted); font-family: var(--mono); font-size: 11.5px; }
+    input[type="text"] { width: 100%; padding: 9px 11px; font-size: 14px; color: var(--ink);
+      border: 1px solid #cfd4e2; border-radius: 8px; background: #fcfcff; }
+    input:focus { outline: 2px solid #b9c6f7; border-color: var(--brand); }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+    .btn { appearance: none; border: 1px solid var(--brand); background: var(--brand); color: #fff; padding: 9px 16px;
+      border-radius: 8px; font-size: 14px; cursor: pointer; text-decoration: none; display: inline-block; }
+    .btn.ghost { background: #fff; color: var(--brand); }
+    pre { margin: 0; background: var(--code-bg); color: var(--code-ink); border-radius: 8px; padding: 12px 14px;
+      font-family: var(--mono); font-size: 12.5px; line-height: 1.65; white-space: pre-wrap; word-break: break-all; }
+    .line { font-family: var(--mono); font-size: 13px; background: #eef1f8; border: 1px solid var(--line);
+      border-radius: 8px; padding: 9px 12px; }
+    .method { font-weight: 700; color: #b45309; }
+    .badge { display: inline-block; font-family: var(--mono); font-size: 12.5px; font-weight: 700; padding: 3px 10px;
+      border-radius: 999px; background: #eef1f8; color: var(--muted); border: 1px solid var(--line); }
+    .badge.ok { background: var(--ok-bg); color: var(--ok); border-color: #a7f3d0; }
+    .badge.err { background: var(--err-bg); color: var(--err); border-color: #fecaca; }
+    .badge.wait { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+    .result { border-radius: 10px; padding: 12px 14px; font-size: 13.5px; margin-top: 12px; display: none; }
+    .result.ok { display: block; background: var(--ok-bg); border: 1px solid #a7f3d0; color: #0b5f59; }
+    .result.err { display: block; background: var(--err-bg); border: 1px solid #fecaca; color: #8f1d1d; }
+    .note { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <h1>修改资料</h1>
+      <p>PUT <code>/api/users/profiles</code> · 当前会话用户：{{ username }}</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card">
+      <h2>① 修改表单</h2>
+      <p class="hint">
+        HTML 表单只支持 GET / POST，所以这里用 <code>fetch</code> 把请求方法改写为 <strong>PUT</strong>，
+        请求体依旧是 <code>application/x-www-form-urlencoded</code>。完成后<strong>不自动跳转</strong>。
+      </p>
+      <form id="form" action="/api/users/profiles">
+        <label class="field">
+          <span>新用户名 <em>newusername</em>（留空表示不修改）</span>
+          <input id="newusername" name="newusername" type="text" placeholder="{{ username }}" />
+        </label>
+        <label class="field">
+          <span>新姓名 <em>newname</em>（留空表示不修改）</span>
+          <input id="newname" name="newname" type="text" />
+        </label>
+        <div class="actions">
+          <button class="btn" type="submit">发送 PUT /api/users/profiles</button>
+          <a class="btn ghost" href="/api/users/me">返回我的信息</a>
+        </div>
+      </form>
+      <div class="result" id="result"></div>
+    </section>
+
+    <section class="card">
+      <h2>② 请求 / 响应</h2>
+      <div class="line"><span class="method">PUT</span> /api/users/profiles HTTP/1.1</div>
+      <h3>请求头</h3>
+      <pre id="reqHeaders">—</pre>
+      <h3>请求体</h3>
+      <pre id="reqBody">—</pre>
+      <h3>响应</h3>
+      <div><span class="badge wait" id="resStatus">等待提交…</span></div>
+      <pre id="resBody" style="margin-top:10px">—</pre>
+      <div class="note">
+        服务端规则：两个字段都为空 / 新旧值完全相同 → <code>400</code>；会话失效 → <code>401</code>；
+        成功 → <code>200</code> 且若改了用户名，会把新用户名写回会话。
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+      var form = document.getElementById("form");
+      var ACTION = form.getAttribute("action");
+      var reqBody = document.getElementById("reqBody");
+      var reqHeaders = document.getElementById("reqHeaders");
+      var resStatus = document.getElementById("resStatus");
+      var resBody = document.getElementById("resBody");
+      var result = document.getElementById("result");
+
+      function encode() {
+        var p = new URLSearchParams();
+        var u = document.getElementById("newusername").value;
+        var n = document.getElementById("newname").value;
+        if (u) p.set("newusername", u);
+        if (n) p.set("newname", n);
+        return p;
+      }
+      function renderRequest() {
+        var raw = encode().toString();
+        reqHeaders.textContent = [
+          "Host: " + location.host,
+          "Content-Type: application/x-www-form-urlencoded",
+          "Content-Length: " + new Blob([raw]).size,
+          "Accept: application/json",
+          "Cookie: （会话 Cookie 自动携带）"
+        ].join("\n");
+        reqBody.textContent = raw || "（空：两个输入框都留空时不会发送任何字段）";
+      }
+      function setStatus(t, c) { resStatus.textContent = t; resStatus.className = "badge " + c; }
+
+      form.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var raw = encode().toString();
+        setStatus("发送中…", "wait");
+        result.className = "result";
+        fetch(ACTION, {
+          method: "PUT",
+          headers: { "Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json" },
+          body: raw,
+          credentials: "same-origin"
+        }).then(function (res) {
+          return res.text().then(function (text) {
+            setStatus(res.status + " " + res.statusText, res.ok ? "ok" : "err");
+            try { resBody.textContent = JSON.stringify(JSON.parse(text), null, 2); }
+            catch (err) { resBody.textContent = text; }
+            var data = null;
+            try { data = JSON.parse(text); } catch (err) { data = null; }
+            if (res.ok) {
+              result.className = "result ok";
+              result.innerHTML = "<strong>修改成功（200 OK），页面保持不动。</strong>" +
+                "如果改了用户名，会话里的 username 也已同步；点「返回我的信息」可以看到最新值。";
+            } else {
+              result.className = "result err";
+              result.innerHTML = "<strong>修改失败（" + res.status + "）</strong>" +
+                String((data && data.error) || text).replace(/[<>&]/g, "");
+            }
+          });
+        });
+      });
+
+      ["input", "change"].forEach(function (evt) { form.addEventListener(evt, renderRequest); });
+      renderRequest();
+    })();
+  </script>
+</body>
+</html>

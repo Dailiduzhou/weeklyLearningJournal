@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{ title }} · POST 请求演示</title>
+  <style>
+    :root {
+      --bg: #f5f6fb;
+      --card: #ffffff;
+      --ink: #1f2430;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --brand: #3b5bdb;
+      --ok: #0f766e;
+      --ok-bg: #ecfdf5;
+      --err: #b91c1c;
+      --err-bg: #fef2f2;
+      --warn-bg: #fffbeb;
+      --warn: #b45309;
+      --code-bg: #0f172a;
+      --code-ink: #e2e8f0;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.6;
+    }
+    code { font-family: var(--mono); font-size: .9em; background: #eef1f8; padding: 1px 5px; border-radius: 4px; }
+    .top { background: linear-gradient(135deg, #24306e, #3b5bdb); color: #fff; padding: 22px 0; }
+    .top h1 { margin: 0 0 4px; font-size: 22px; }
+    .top p { margin: 0; opacity: .85; font-size: 13.5px; }
+    .top code { background: rgba(255,255,255,.15); color: #fff; }
+    .wrap { max-width: 1160px; margin: 0 auto; padding: 0 20px; }
+    main.wrap { padding-top: 22px; padding-bottom: 60px; }
+    .grid { display: grid; gap: 18px; grid-template-columns: 1fr; align-items: start; }
+    @media (min-width: 1000px) {
+      .grid { grid-template-columns: minmax(340px, 400px) 1fr; }
+    }
+    .col { display: grid; gap: 18px; align-content: start; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 18px 20px 20px;
+      box-shadow: 0 1px 2px rgba(16, 24, 40, .04);
+    }
+    .card h2 { margin: 0 0 8px; font-size: 16px; letter-spacing: .2px; }
+    .card h3 { margin: 14px 0 6px; font-size: 12.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; font-weight: 600; }
+    .hint { font-size: 13px; color: var(--muted); margin: 0 0 16px; }
+    .field { display: block; margin-bottom: 12px; }
+    .field > span { display: block; font-size: 13px; font-weight: 600; margin-bottom: 5px; }
+    .field em { font-style: normal; font-weight: 400; color: var(--muted); font-family: var(--mono); font-size: 11.5px; }
+    input[type="text"], input[type="password"] {
+      width: 100%; padding: 9px 11px; font-size: 14px; color: var(--ink);
+      border: 1px solid #cfd4e2; border-radius: 8px; background: #fcfcff;
+    }
+    input[type="text"]:focus, input[type="password"]:focus { outline: 2px solid #b9c6f7; border-color: var(--brand); }
+    .opts { margin: 4px 0 16px; display: grid; gap: 6px; }
+    .check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); cursor: pointer; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+    .btn {
+      appearance: none; border: 1px solid var(--brand); background: var(--brand); color: #fff;
+      padding: 9px 16px; border-radius: 8px; font-size: 14px; cursor: pointer; text-decoration: none;
+      display: inline-block;
+    }
+    .btn:hover { filter: brightness(1.06); }
+    .btn.ghost { background: #fff; color: var(--brand); }
+    .btn.ghost:hover { background: #f2f5ff; }
+    .btn.small { padding: 6px 12px; font-size: 13px; }
+    pre {
+      margin: 0; background: var(--code-bg); color: var(--code-ink); border-radius: 8px;
+      padding: 12px 14px; overflow-x: auto; font-family: var(--mono); font-size: 12.5px; line-height: 1.65;
+      white-space: pre-wrap; word-break: break-all;
+    }
+    .line { font-family: var(--mono); font-size: 13px; background: #eef1f8; border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; }
+    .method { font-weight: 700; color: #b91c1c; }
+    .badge {
+      display: inline-block; font-family: var(--mono); font-size: 12.5px; font-weight: 700;
+      padding: 3px 10px; border-radius: 999px; background: #eef1f8; color: var(--muted); border: 1px solid var(--line);
+    }
+    .badge.ok { background: var(--ok-bg); color: var(--ok); border-color: #a7f3d0; }
+    .badge.err { background: var(--err-bg); color: var(--err); border-color: #fecaca; }
+    .badge.wait { background: var(--warn-bg); color: var(--warn); border-color: #fde68a; }
+    .meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+    .result { border-radius: 10px; padding: 12px 14px; font-size: 13.5px; }
+    .result.ok { background: var(--ok-bg); border: 1px solid #a7f3d0; color: #0b5f59; }
+    .result.err { background: var(--err-bg); border: 1px solid #fecaca; color: #8f1d1d; }
+    .result strong { display: block; margin-bottom: 4px; font-size: 14px; }
+    .kv { font-family: var(--mono); font-size: 12.5px; margin: 6px 0 0; }
+    .links { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    details { margin-top: 14px; font-size: 12.5px; color: var(--muted); }
+    summary { cursor: pointer; }
+    table { border-collapse: collapse; width: 100%; margin-top: 8px; font-size: 12.5px; }
+    th, td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; }
+    th { background: #f7f8fc; }
+    td:first-child { font-family: var(--mono); font-weight: 700; white-space: nowrap; }
+    .note { font-size: 12.5px; color: var(--muted); margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <header class="top">
+    <div class="wrap">
+      <h1>{{ title }} · POST 请求演示</h1>
+      <p>actix-web + actix-session + sqlx · <code>POST /api/users/login</code> · 登录成功后<strong>不自动跳转</strong></p>
+    </div>
+  </header>
+
+  <main class="wrap grid">
+    <section class="card">
+      <h2>① 填写登录表单</h2>
+      <p class="hint">
+        点击提交后，右侧会展示浏览器将要发出的<strong>原始请求行、请求头、请求体</strong>，以及服务端返回的状态码与 JSON。
+        服务端 <code>login</code> 处理器返回的是 JSON 而<strong>不是 302</strong>，所以本页会停在原地，等你手动选择下一步。
+      </p>
+      <form id="loginForm" action="/api/users/login" method="post">
+        <label class="field">
+          <span>用户名 <em>username</em></span>
+          <input id="username" name="username" type="text" placeholder="admin" autocomplete="username" required />
+        </label>
+        <label class="field">
+          <span>密码 <em>password</em></span>
+          <input id="password" name="password" type="password" placeholder="******" autocomplete="current-password" required />
+        </label>
+        <div class="opts">
+          <label class="check"><input id="showPassword" type="checkbox" /> 在请求体中显示明文密码</label>
+          <label class="check"><input id="nativeMode" type="checkbox" /> 改用浏览器原生表单提交（对比用，会离开本页）</label>
+        </div>
+        <div class="actions">
+          <button class="btn" type="submit" id="submitBtn">发送 POST /api/users/login</button>
+          <button class="btn ghost" type="reset" id="resetBtn">重置</button>
+        </div>
+      </form>
+    </section>
+
+    <div class="col">
+      <section class="card">
+        <h2>② 请求 Request（实时预览）</h2>
+        <div class="line"><span class="method">POST</span> <span id="reqPath">/api/users/login</span> <span style="color:var(--muted)">HTTP/1.1</span></div>
+        <h3>请求头 Headers</h3>
+        <pre id="reqHeaders">—</pre>
+        <h3>请求体 Body（application/x-www-form-urlencoded）</h3>
+        <pre id="reqBody">—</pre>
+        <div class="meta" id="reqMeta"></div>
+        <h3>等价 curl</h3>
+        <pre id="reqCurl">—</pre>
+        <div class="note">
+          表单 <code>enctype</code> 默认为 <code>application/x-www-form-urlencoded</code>；
+          这里用 <code>fetch</code> 发送同样的字节，就是为了把请求和响应“摊开”给你看。
+          <code>credentials: "same-origin"</code> 是会话能否生效的关键。
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>③ 响应 Response</h2>
+        <div><span class="badge wait" id="resStatus">等待提交…</span> <span class="meta" id="resTime"></span></div>
+        <h3>响应头 Headers</h3>
+        <pre id="resHeaders">—</pre>
+        <div class="note">
+          注意：<code>set-cookie</code> 属于浏览器安全过滤的响应头，<code>fetch</code> 读不到它
+          （但浏览器已经把它存进 Cookie 了）。想亲眼看它，请打开 DevTools → Network → 这次 POST 请求 → Response Headers。
+        </div>
+        <h3>响应体 Body（JSON）</h3>
+        <pre id="resBody">—</pre>
+        <details>
+          <summary>服务端可能返回的状态码（来自 src/main.rs 的 login 处理器）</summary>
+          <table>
+            <thead><tr><th>状态码</th><th>触发条件</th></tr></thead>
+            <tbody>
+              <tr><td>400</td><td>用户名或密码为空</td></tr>
+              <tr><td>404</td><td>用户不存在（<code>fetch_optional</code> 返回 None）</td></tr>
+              <tr><td>403</td><td>密码错误（bcrypt <code>verify</code> 失败）</td></tr>
+              <tr><td>500</td><td>会话创建失败 / 数据库异常</td></tr>
+              <tr><td>200</td><td>登录成功，返回 <code>{username, name}</code> 并写入会话 Cookie</td></tr>
+            </tbody>
+          </table>
+        </details>
+      </section>
+
+      <section class="card" id="resultCard" style="display:none">
+        <h2>④ 结果 · 手动选择下一步</h2>
+        <div id="resultBox" class="result"></div>
+        <p class="note" id="resultNote"></p>
+        <div class="links" id="nextLinks" style="display:none">
+          <a class="btn small" href="/api/users/me">GET /api/users/me → 我的信息</a>
+          <a class="btn small ghost" href="/api/users/profiles">GET /api/users/profiles</a>
+          <a class="btn small ghost" href="/api/users/password">GET /api/users/password</a>
+          <a class="btn small ghost" href="/api/admin/users">GET /api/admin/users（JSON）</a>
+          <button class="btn small ghost" type="button" id="logoutBtn">POST /api/users/logout</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    (function () {
+      "use strict";
+      var form = document.getElementById("loginForm");
+      var nativeMode = document.getElementById("nativeMode");
+      var showPassword = document.getElementById("showPassword");
+      var inputUsername = document.getElementById("username");
+      var inputPassword = document.getElementById("password");
+      var reqPath = document.getElementById("reqPath");
+      var reqHeaders = document.getElementById("reqHeaders");
+      var reqBody = document.getElementById("reqBody");
+      var reqMeta = document.getElementById("reqMeta");
+      var reqCurl = document.getElementById("reqCurl");
+      var resStatus = document.getElementById("resStatus");
+      var resTime = document.getElementById("resTime");
+      var resHeaders = document.getElementById("resHeaders");
+      var resBody = document.getElementById("resBody");
+      var resultCard = document.getElementById("resultCard");
+      var resultBox = document.getElementById("resultBox");
+      var resultNote = document.getElementById("resultNote");
+      var nextLinks = document.getElementById("nextLinks");
+      var logoutBtn = document.getElementById("logoutBtn");
+
+      var ACTION = form.getAttribute("action") || "/api/users/login";
+      var ERR_HINT = {
+        400: "参数校验失败：用户名或密码为空。",
+        401: "未认证：会话中没有 username。",
+        403: "密码错误：bcrypt verify 不通过。",
+        404: "用户不存在：数据库里没有这个 username。",
+        500: "服务端内部错误（会话或数据库异常）。"
+      };
+
+      function byteLength(s) {
+        return new Blob([s]).size;
+      }
+
+      function encode(values) {
+        var params = new URLSearchParams();
+        params.set("username", values.username);
+        params.set("password", values.password);
+        return params;
+      }
+
+      function rawValues() {
+        return { username: inputUsername.value, password: inputPassword.value };
+      }
+
+      function maskedBody(values) {
+        return "username=" + encodeURIComponent(values.username) +
+               "&password=" + new Array(values.password.length + 1).join("\u2022");
+      }
+
+      /** 实时渲染“即将发出的请求” */
+      function renderRequest() {
+        var values = rawValues();
+        var raw = encode(values).toString();
+        var shown = showPassword.checked ? raw : maskedBody(values);
+        var origin = window.location.origin;
+
+        reqPath.textContent = ACTION;
+        reqHeaders.textContent = [
+          "Host: " + window.location.host,
+          "Content-Type: application/x-www-form-urlencoded",
+          "Content-Length: " + byteLength(raw),
+          "Accept: application/json",
+          "Origin: " + origin,
+          "Cookie: （由浏览器自动携带，页面 JS 无法读取会话 Cookie）"
+        ].join("\n");
+        reqBody.textContent = shown;
+        reqMeta.textContent = "字节数 " + byteLength(raw) + " · 字段 username=" + byteLength(values.username) +
+          "B, password=" + byteLength(values.password) + "B" + (showPassword.checked ? "" : "（密码已遮蔽）");
+
+        reqCurl.textContent =
+          "# 等价命令行请求\n" +
+          "curl -i -X POST '" + origin + ACTION + "' \\\n" +
+          "  -H 'Content-Type: application/x-www-form-urlencoded' \\\n" +
+          "  -c cookies.txt \\\n" +
+          "  --data '" + shown + "'";
+      }
+
+      function setStatus(text, cls) {
+        resStatus.textContent = text;
+        resStatus.className = "badge" + (cls ? " " + cls : "");
+      }
+
+      function renderResponse(res, text, ms) {
+        var lines = [];
+        res.headers.forEach(function (value, key) {
+          lines.push(key + ": " + value);
+        });
+        resHeaders.textContent = lines.length ? lines.join("\n") : "（无可见响应头）";
+        var pretty = text;
+        try {
+          pretty = JSON.stringify(JSON.parse(text), null, 2);
+        } catch (e) { /* 非 JSON 原样展示 */ }
+        resBody.textContent = pretty || "（空响应体）";
+        resTime.textContent = "耗时约 " + ms + " ms";
+        setStatus(res.status + " " + (res.statusText || ""), res.ok ? "ok" : "err");
+      }
+
+      function renderResult(res, text) {
+        var data = null;
+        try { data = JSON.parse(text); } catch (e) { data = null; }
+        resultCard.style.display = "";
+        nextLinks.style.display = res.ok ? "flex" : "none";
+
+        if (res.ok) {
+          var name = data && data.name ? data.name : "(未知)";
+          var username = data && data.username ? data.username : rawValues().username;
+          resultBox.className = "result ok";
+          resultBox.innerHTML =
+            "<strong>登录成功（200 OK）—— 页面保持不动，不自动跳转</strong>" +
+            "服务端返回 JSON，而不是 <code>302 / Location</code>，所以浏览器没有发生任何导航。<br>" +
+            "会话 Cookie（HttpOnly，JS 读不到）已由浏览器自动保存，接下来的受保护页面会通过 <code>session.get(\"username\")</code> 校验身份。";
+          resultNote.innerHTML =
+            "<div class='kv'>username = " + escapeHtml(username) + "</div>" +
+            "<div class='kv'>name = " + escapeHtml(name) + "</div>" +
+            "需要跳转时请点击下面的按钮（或自行在代码里改成返回 302 让服务端驱动跳转）。";
+        } else {
+          var msg = data && data.error ? data.error : (text || "未知错误");
+          resultBox.className = "result err";
+          resultBox.innerHTML =
+            "<strong>登录失败（" + res.status + " " + escapeHtml(res.statusText || "") + "）</strong>" +
+            "错误信息：" + escapeHtml(msg) + "<br>" +
+            "本页同样不会跳转，可修改输入后重新提交。";
+          resultNote.innerHTML = ERR_HINT[res.status]
+            ? "<div class='kv'>" + escapeHtml(ERR_HINT[res.status]) + "</div>"
+            : "";
+        }
+        resultCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+
+      function escapeHtml(s) {
+        return String(s).replace(/[&<>"']/g, function (c) {
+          return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+        });
+      }
+
+      form.addEventListener("submit", function (event) {
+        if (nativeMode.checked) {
+          // 交给浏览器原生提交：页面会离开，直接显示服务端返回的 JSON
+          setStatus("原生提交中…", "wait");
+          return;
+        }
+        event.preventDefault();
+        renderRequest();                        // 确保展示的请求与实际发送的字节一致
+        var raw = encode(rawValues()).toString();
+        setStatus("请求发送中…", "wait");
+        resTime.textContent = "";
+        resHeaders.textContent = "—";
+        resBody.textContent = "—";
+        var t0 = window.performance.now();
+
+        fetch(ACTION, {
+          method: "POST",                       // 与 <form method="post"> 一致
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json"
+          },
+          body: raw,
+          credentials: "same-origin"            // 关键：保存 / 携带会话 Cookie
+        })
+          .then(function (res) {
+            return res.text().then(function (text) {
+              renderResponse(res, text, (window.performance.now() - t0).toFixed(1));
+              renderResult(res, text);
+            });
+          })
+          .catch(function (err) {
+            setStatus("网络错误", "err");
+            resBody.textContent = String(err);
+            resultCard.style.display = "";
+            nextLinks.style.display = "none";
+            resultBox.className = "result err";
+            resultBox.innerHTML = "<strong>请求未能到达服务器</strong>" + escapeHtml(String(err));
+          });
+      });
+
+      ["input", "change"].forEach(function (evt) {
+        form.addEventListener(evt, renderRequest);
+      });
+
+      form.addEventListener("reset", function () {
+        window.setTimeout(function () {
+          renderRequest();
+          resultCard.style.display = "none";
+          nextLinks.style.display = "none";
+          setStatus("等待提交…", "wait");
+          resTime.textContent = "";
+          resHeaders.textContent = "—";
+          resBody.textContent = "—";
+        }, 0);
+      });
+
+      logoutBtn.addEventListener("click", function () {
+        fetch("/api/users/logout", { method: "POST", credentials: "same-origin" })
+          .then(function (res) {
+            return res.text().then(function (text) {
+              renderResponse(res, text, "0.0");
+              resultBox.className = "result";
+              resultBox.innerHTML = "<strong>已发送 POST /api/users/logout</strong>会话已清除，再访问 /api/users/me 会被重定向回登录页。";
+              nextLinks.style.display = "none";
+              resultNote.innerHTML = "";
+            });
+          })
+          .catch(function (err) { resBody.textContent = String(err); });
+      });
+
+      renderRequest();
+    })();
+  </script>
+</body>
+</html>
