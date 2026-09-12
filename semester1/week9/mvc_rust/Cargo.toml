@@ -1,7 +1,11 @@
 [package]
 name = "mvc_rust"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
+# edition 2024 需要 Cargo >= 1.85。写上 rust-version 的好处是：
+# 用旧工具链时会得到一句清楚的 "package requires rustc 1.85 or newer"，
+# 而不是难以理解的 "feature `edition2024` is required"（Dockerfile 里的镜像就是被这个坑过）。
+rust-version = "1.85"
 
 [dependencies]
 actix-web = "4"
@@ -10,7 +14,12 @@ tera = "1.17"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 bcrypt = "0.15"
-sqlx = { version = "0.7", default-features = false, features = ["runtime-tokio", "mysql", "chrono", "macros"] }
+sqlx = { version = "0.7", default-features = false, features = [
+  "runtime-tokio",
+  "mysql",
+  "chrono",
+  "macros",
+] }
 chrono = { version = "0.4", features = ["serde"] }
 env_logger = "0.10"
 log = "0.4"

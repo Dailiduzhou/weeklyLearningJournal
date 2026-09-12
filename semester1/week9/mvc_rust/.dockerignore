@@ -1,0 +1,9 @@
+# 构建镜像时不要带进去的东西（target/ 动辄几百 MB）
+target/
+.git/
+.gitignore
+*.md
+*.log
+run.sh
+docker-compose.yml
+scripts/

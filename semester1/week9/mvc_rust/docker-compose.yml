@@ -1,0 +1,58 @@
+# mvc_rust 本地开发环境
+#
+#   默认（只起数据库，应用用宿主机 cargo run 跑，方便看编译/日志）：
+#     docker compose up -d mysql
+#
+#   全部跑在容器里（应用 + 数据库）：
+#     docker compose --profile full up --build
+#
+# 端口说明：容器内 MySQL 是 3306，映射到宿主机 3307，
+# 因为 src/main.rs 里的默认连接串写的是 127.0.0.1:3307（与 week6 Go 版保持一致）。
+name: mvc_rust
+
+services:
+  mysql:
+    image: mysql:8
+    container_name: mvc_rust-mysql
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: "123456"
+      MYSQL_DATABASE: ginserver
+      TZ: Asia/Shanghai
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      # 首次启动（数据卷为空）时自动建库建表并预置 admin 账号
+      - ./scripts/db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-p123456"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mvc_rust:local
+    container_name: mvc_rust-app
+    # 只有显式 --profile full 时才会启动，默认不动它
+    profiles: ["full"]
+    environment:
+      # 容器内走服务名 + 容器端口，覆盖 main.rs 里的默认值
+      DATABASE_URL: mysql://root:123456@mysql:3306/ginserver
+      RUST_LOG: info
+    ports:
+      - "8080:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mysql_data:

@@ -389,11 +389,14 @@ async fn main() -> std::io::Result<()> {
     env_logger::init();
     let key = Key::generate();
 
-    // MySQL settings same as Go config
-    let db_url = "mysql://root:123456@localhost:3307/ginserver";
+    // MySQL settings same as Go config;
+    // 默认连宿主机 3307（和 week6 Go 版一致），可用 DATABASE_URL 覆盖：
+    //   docker compose 里用服务名 mysql:3306，或者你本机别的 MySQL
+    let db_url = std::env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "mysql://root:123456@localhost:3307/ginserver".to_string());
     let pool = MySqlPoolOptions::new()
         .max_connections(5)
-        .connect(db_url)
+        .connect(&db_url)
         .await
         .expect("数据库连接失败");
 
