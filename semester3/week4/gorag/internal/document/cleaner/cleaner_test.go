@@ -63,3 +63,61 @@ func TestCleanHandlesMultilineAndInlineComments(t *testing.T) {
 		t.Fatalf("Clean() = %q", result.Content)
 	}
 }
+
+func TestCleanParsesFrontMatterScalarsAndTagLists(t *testing.T) {
+	// The knowledge base's real front matter shape: scalar keys plus a
+	// block-style tags list.
+	input := "---\n" +
+		"category: ccnubox\n" +
+		"type: optimization\n" +
+		"topic: crypto\n" +
+		"module: bff\n" +
+		"status: done\n" +
+		"tags:\n" +
+		"  - ccnubox\n" +
+		"  - ccnubox/bff\n" +
+		"  - ccnubox/crypto\n" +
+		"---\n" +
+		"# Body"
+	result := Clean(input, Options{ParseFrontMatter: true})
+
+	wantScalars := map[string]string{
+		"category": "ccnubox", "type": "optimization", "topic": "crypto",
+		"module": "bff", "status": "done",
+	}
+	if len(result.FrontMatter) != len(wantScalars) {
+		t.Fatalf("Clean() scalars = %#v, want %#v", result.FrontMatter, wantScalars)
+	}
+	for key, want := range wantScalars {
+		if result.FrontMatter[key] != want {
+			t.Fatalf("Clean() scalar %q = %q, want %q", key, result.FrontMatter[key], want)
+		}
+	}
+	if len(result.FrontMatterLists) != 1 || len(result.FrontMatterLists["tags"]) != 3 ||
+		result.FrontMatterLists["tags"][0] != "ccnubox" ||
+		result.FrontMatterLists["tags"][1] != "ccnubox/bff" ||
+		result.FrontMatterLists["tags"][2] != "ccnubox/crypto" {
+		t.Fatalf("Clean() lists = %#v, want the three parsed tags", result.FrontMatterLists)
+	}
+	if result.Content != "# Body" {
+		t.Fatalf("Clean() content = %q, want %q", result.Content, "# Body")
+	}
+}
+
+func TestCleanFrontMatterListEdgeCases(t *testing.T) {
+	// A bare key without items stays an empty scalar, and list items stop at
+	// the next non-item line.
+	result := Clean("---\nempty:\nname: value\n---\nBody", Options{ParseFrontMatter: true})
+	if result.FrontMatter["empty"] != "" || result.FrontMatter["name"] != "value" {
+		t.Fatalf("Clean() scalars = %#v, want empty scalar preserved", result.FrontMatter)
+	}
+	if result.FrontMatterLists != nil {
+		t.Fatalf("Clean() lists = %#v, want nil", result.FrontMatterLists)
+	}
+
+	// Inline arrays are not supported and must not corrupt scalar parsing.
+	result = Clean("---\ntags: [a, b]\nname: value\n---\nBody", Options{ParseFrontMatter: true})
+	if result.FrontMatter["tags"] != "[a, b]" || result.FrontMatter["name"] != "value" {
+		t.Fatalf("Clean() scalars = %#v, want inline array kept as scalar", result.FrontMatter)
+	}
+}

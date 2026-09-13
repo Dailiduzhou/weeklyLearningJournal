@@ -85,11 +85,18 @@ func TestPgvectorRepositoryIntegration(t *testing.T) {
 		DocumentID: doc.ID, Version: "v1", ExpectedChunkCount: 1,
 		Title: "Authentication", ContentHash: "file-v1",
 		Parent: ActivationParent{Content: "first parent", StartLine: 1, EndLine: 12},
+		Metadata: document.DocumentMetadata{
+			Scalars: map[string]string{
+				"category": "ccnubox", "type": "optimization", "topic": "crypto",
+				"module": "bff", "status": "done",
+			},
+			Lists: map[string][]string{"tags": {"ccnubox", "ccnubox/bff", "ccnubox/crypto"}},
+		},
 	}); err != nil {
 		t.Fatalf("ActivateVersion(v1) error = %v", err)
 	}
 
-	results, err := repository.Search(ctx, unitVector(0), 5)
+	results, err := repository.Search(ctx, unitVector(0), 5, document.MetadataFilter{})
 	if err != nil || len(results) != 1 || results[0].DocumentVersion != "v1" {
 		t.Fatalf("Search(v1) = %#v, error %v", results, err)
 	}
@@ -108,6 +115,101 @@ func TestPgvectorRepositoryIntegration(t *testing.T) {
 		t.Fatalf("GetParentDocuments(unknown id) = %#v, error %v, want empty", parents, err)
 	}
 
+	// A second document with different front matter proves filters select
+	// between documents, not just narrow a single-document result.
+	guide, _, err := repository.GetOrCreateDocument(ctx, DocumentCreate{
+		SourcePath: "guide/bff.md", Title: "BFF Guide", ContentHash: "guide-v1",
+	})
+	if err != nil {
+		t.Fatalf("GetOrCreateDocument(guide) error = %v", err)
+	}
+	guideChunks := []VersionChunk{testStoredChunk("v1", 0, "guide content", unitVector(1))}
+	if err := repository.InsertVersion(ctx, guide.ID, "v1", guideChunks); err != nil {
+		t.Fatalf("InsertVersion(guide) error = %v", err)
+	}
+	if err := repository.ActivateVersion(ctx, Activation{
+		DocumentID: guide.ID, Version: "v1", ExpectedChunkCount: 1,
+		Title: "BFF Guide", ContentHash: "guide-v1",
+		Parent: ActivationParent{Content: "guide parent", StartLine: 1, EndLine: 9},
+		Metadata: document.DocumentMetadata{
+			Scalars: map[string]string{"category": "notes", "module": "cli"},
+			Lists:   map[string][]string{"tags": {"notes", "notes/cli"}},
+		},
+	}); err != nil {
+		t.Fatalf("ActivateVersion(guide) error = %v", err)
+	}
+
+	// Scalar filters keep only exactly matching documents.
+	results, err = repository.Search(ctx, unitVector(0), 5, document.MetadataFilter{
+		Metadata: map[string]string{"category": "ccnubox"},
+	})
+	if err != nil || len(results) != 1 || results[0].DocumentID != doc.ID {
+		t.Fatalf("Search(category=ccnubox) = %#v, error %v, want only the first document", results, err)
+	}
+	results, err = repository.Search(ctx, unitVector(0), 5, document.MetadataFilter{
+		Metadata: map[string]string{"category": "ccnubox", "module": "bff"},
+	})
+	if err != nil || len(results) != 1 || results[0].DocumentID != doc.ID {
+		t.Fatalf("Search(ccnubox+bff) = %#v, error %v, want only the first document", results, err)
+	}
+	// Contradictory scalar constraints match nothing.
+	if results, err = repository.Search(ctx, unitVector(0), 5, document.MetadataFilter{
+		Metadata: map[string]string{"category": "ccnubox", "module": "cli"},
+	}); err != nil || len(results) != 0 {
+		t.Fatalf("Search(contradictory) = %#v, error %v, want empty", results, err)
+	}
+	// Tags use any-of overlap.
+	results, err = repository.Search(ctx, unitVector(0), 5, document.MetadataFilter{
+		Tags: []string{"notes/cli", "missing"},
+	})
+	if err != nil || len(results) != 1 || results[0].DocumentID != guide.ID {
+		t.Fatalf("Search(tags any-of) = %#v, error %v, want only the guide document", results, err)
+	}
+	// Scalar and tag constraints combine conjunctively.
+	results, err = repository.Search(ctx, unitVector(0), 5, document.MetadataFilter{
+		Metadata: map[string]string{"module": "bff"},
+		Tags:     []string{"ccnubox/bff"},
+	})
+	if err != nil || len(results) != 1 || results[0].DocumentID != doc.ID {
+		t.Fatalf("Search(module=bff and tag) = %#v, error %v, want only the first document", results, err)
+	}
+	// An empty filter keeps the previous, unfiltered behaviour.
+	results, err = repository.Search(ctx, unitVector(0), 5, document.MetadataFilter{})
+	if err != nil || len(results) != 2 {
+		t.Fatalf("Search(no filter) = %#v, error %v, want both documents", results, err)
+	}
+	// Documents indexed before this feature carry no metadata and are
+	// therefore excluded by any metadata filter.
+	legacy, _, err := repository.GetOrCreateDocument(ctx, DocumentCreate{
+		SourcePath: "legacy/old.md", Title: "Legacy", ContentHash: "legacy-v1",
+	})
+	if err != nil {
+		t.Fatalf("GetOrCreateDocument(legacy) error = %v", err)
+	}
+	legacyChunks := []VersionChunk{testStoredChunk("v1", 0, "legacy content", unitVector(2))}
+	if err := repository.InsertVersion(ctx, legacy.ID, "v1", legacyChunks); err != nil {
+		t.Fatalf("InsertVersion(legacy) error = %v", err)
+	}
+	if err := repository.ActivateVersion(ctx, Activation{
+		DocumentID: legacy.ID, Version: "v1", ExpectedChunkCount: 1,
+		Title: "Legacy", ContentHash: "legacy-v1",
+		Parent:   ActivationParent{Content: "legacy parent", StartLine: 1, EndLine: 2},
+		Metadata: document.DocumentMetadata{},
+	}); err != nil {
+		t.Fatalf("ActivateVersion(legacy) error = %v", err)
+	}
+	if results, err = repository.Search(ctx, unitVector(0), 5, document.MetadataFilter{
+		Metadata: map[string]string{"category": "ccnubox"},
+	}); err != nil || len(results) != 1 || results[0].DocumentID != doc.ID {
+		t.Fatalf("Search(legacy excluded) = %#v, error %v, want only the first document", results, err)
+	}
+	// Invalid filters are rejected before the query runs.
+	if _, err := repository.Search(ctx, unitVector(0), 5, document.MetadataFilter{
+		Metadata: map[string]string{"category": " "},
+	}); err == nil {
+		t.Fatal("Search(invalid filter) error = nil")
+	}
+
 	// The more similar v2 chunk is deliberately incomplete. It must stay
 	// invisible and a failed activation must leave v1 current.
 	v2 := []VersionChunk{testStoredChunk("v2", 0, "second", unitVector(0))}
@@ -122,9 +224,25 @@ func TestPgvectorRepositoryIntegration(t *testing.T) {
 	if !errors.Is(err, ErrIncompleteVersion) {
 		t.Fatalf("ActivateVersion(incomplete v2) error = %v, want ErrIncompleteVersion", err)
 	}
-	results, err = repository.Search(ctx, unitVector(0), 5)
-	if err != nil || len(results) != 1 || results[0].DocumentVersion != "v1" {
-		t.Fatalf("Search after failed activation = %#v, error %v", results, err)
+	results, err = repository.Search(ctx, unitVector(0), 5, document.MetadataFilter{})
+	if err != nil {
+		t.Fatalf("Search after failed activation error = %v", err)
+	}
+	// The incomplete v2 must stay invisible even though every other active
+	// document is still searchable.
+	for _, result := range results {
+		if result.DocumentID == doc.ID && result.DocumentVersion != "v1" {
+			t.Fatalf("Search after failed activation leaked version %q for document %d", result.DocumentVersion, result.DocumentID)
+		}
+	}
+	foundV1 := false
+	for _, result := range results {
+		if result.DocumentID == doc.ID {
+			foundV1 = true
+		}
+	}
+	if !foundV1 {
+		t.Fatalf("Search after failed activation = %#v, want the still-active v1", results)
 	}
 
 	deleted, err := repository.DeleteInactiveVersions(ctx, doc.ID)
@@ -155,9 +273,18 @@ func TestPgvectorRepositoryIntegration(t *testing.T) {
 	if err := repository.MarkDocumentDeleted(ctx, doc.ID); err != nil {
 		t.Fatalf("MarkDocumentDeleted() error = %v", err)
 	}
-	results, err = repository.Search(ctx, unitVector(0), 5)
-	if err != nil || len(results) != 0 {
-		t.Fatalf("Search(deleted document) = %#v, error %v", results, err)
+	results, err = repository.Search(ctx, unitVector(0), 5, document.MetadataFilter{})
+	if err != nil {
+		t.Fatalf("Search(deleted document) error = %v", err)
+	}
+	// The deleted document must never match again; the other documents stay.
+	for _, result := range results {
+		if result.DocumentID == doc.ID {
+			t.Fatalf("Search(deleted document) = %#v, want the deleted document excluded", results)
+		}
+	}
+	if len(results) != 2 {
+		t.Fatalf("Search(deleted document) = %#v, want the two remaining documents", results)
 	}
 	// A deleted document never serves parent content either.
 	if parents, err = repository.GetParentDocuments(ctx, []int64{doc.ID}); err != nil || len(parents) != 0 {

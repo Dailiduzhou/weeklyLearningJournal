@@ -17,7 +17,10 @@ type Options struct {
 type Result struct {
 	Content     string
 	FrontMatter map[string]string
-	LineNumbers []int
+	// FrontMatterLists holds block-style list values, e.g. a tags list. It is
+	// populated together with FrontMatter when ParseFrontMatter is set.
+	FrontMatterLists map[string][]string
+	LineNumbers      []int
 }
 
 // Clean removes transport-level noise while preserving headings, lists, tables,
@@ -30,9 +33,10 @@ func Clean(content string, options Options) Result {
 	lines := splitNumberedLines(content)
 	result := Result{}
 	if options.ParseFrontMatter {
-		frontMatter, end := parseFrontMatterLines(lines)
+		frontMatter, frontMatterLists, end := parseFrontMatterLines(lines)
 		if end >= 0 {
 			result.FrontMatter = frontMatter
+			result.FrontMatterLists = frontMatterLists
 			lines = lines[end+1:]
 		}
 	}
@@ -76,9 +80,13 @@ func splitNumberedLines(content string) []numberedLine {
 	return lines
 }
 
-func parseFrontMatterLines(lines []numberedLine) (map[string]string, int) {
+// parseFrontMatterLines extracts the YAML-like front matter between ---
+// markers. Values are scalar "key: value" entries; a bare "key:" followed by
+// indented "- item" lines is parsed as a list. Inline arrays are not
+// supported. Trailing whitespace and quotes are trimmed like the scalar form.
+func parseFrontMatterLines(lines []numberedLine) (map[string]string, map[string][]string, int) {
 	if len(lines) < 3 || strings.TrimSpace(lines[0].text) != "---" {
-		return nil, -1
+		return nil, nil, -1
 	}
 	end := -1
 	for index := 1; index < len(lines); index++ {
@@ -89,21 +97,54 @@ func parseFrontMatterLines(lines []numberedLine) (map[string]string, int) {
 		}
 	}
 	if end < 0 {
-		return nil, -1
+		return nil, nil, -1
 	}
-	metadata := make(map[string]string)
-	for _, line := range lines[1:end] {
-		key, value, ok := strings.Cut(line.text, ":")
+	metadata := map[string]string{}
+	lists := map[string][]string{}
+	body := lines[1:end]
+	for index := 0; index < len(body); index++ {
+		key, value, ok := strings.Cut(body[index].text, ":")
 		key = strings.TrimSpace(key)
 		if !ok || key == "" {
 			continue
 		}
-		metadata[key] = strings.Trim(strings.TrimSpace(value), "\"'")
+		value = strings.Trim(strings.TrimSpace(value), "\"'")
+		if value != "" {
+			metadata[key] = value
+			continue
+		}
+		items, next := parseFrontMatterListItems(body, index+1)
+		if len(items) > 0 {
+			lists[key] = items
+			index = next - 1
+			continue
+		}
+		// Preserve the scalar behavior for a bare "key:" without items.
+		metadata[key] = ""
 	}
 	if len(metadata) == 0 {
 		metadata = nil
 	}
-	return metadata, end
+	if len(lists) == 0 {
+		lists = nil
+	}
+	return metadata, lists, end
+}
+
+// parseFrontMatterListItems collects consecutive "- item" lines starting at
+// start. It returns the items and the index just past the last item.
+func parseFrontMatterListItems(body []numberedLine, start int) ([]string, int) {
+	items := make([]string, 0)
+	next := start
+	for next < len(body) {
+		trimmed := strings.TrimSpace(body[next].text)
+		if trimmed != "-" && !strings.HasPrefix(trimmed, "- ") {
+			break
+		}
+		items = append(items, strings.TrimSpace(strings.TrimPrefix(trimmed, "-")))
+		next++
+	}
+	return items, next
 }
 
 func removeHTMLCommentsLines(lines []numberedLine) []numberedLine {

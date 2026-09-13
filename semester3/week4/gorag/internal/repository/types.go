@@ -57,6 +57,10 @@ type Activation struct {
 	// retrieval can expand child chunks back to the exact version being
 	// activated. It is required: every active version owns parent content.
 	Parent ActivationParent
+	// Metadata is the parsed front matter stored with the activation so
+	// retrieval can filter documents by category, type, topic, module, status,
+	// or tags. It is required to be valid, but may be empty.
+	Metadata document.DocumentMetadata
 }
 
 // ActivationParent carries the cleaned document text and its position in the

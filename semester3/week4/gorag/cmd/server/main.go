@@ -19,6 +19,7 @@ import (
 
 	"gorag/internal/bm25"
 	"gorag/internal/config"
+	"gorag/internal/document"
 	"gorag/internal/embedding"
 	"gorag/internal/rag"
 	"gorag/internal/repository"
@@ -29,7 +30,7 @@ import (
 // SearchStore is the vector-search boundary of repository.Repository needed
 // by the online retriever.
 type SearchStore interface {
-	Search(ctx context.Context, queryVector []float32, limit int) ([]repository.SearchResult, error)
+	Search(ctx context.Context, queryVector []float32, limit int, filter document.MetadataFilter) ([]repository.SearchResult, error)
 }
 
 func main() {

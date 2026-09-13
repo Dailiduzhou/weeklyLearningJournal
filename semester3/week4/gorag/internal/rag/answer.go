@@ -8,7 +8,17 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	einoretriever "github.com/cloudwego/eino/components/retriever"
+
+	"gorag/internal/document"
+	queryretriever "gorag/internal/retriever"
 )
+
+// Filter constrains retrieval to documents whose parsed front matter matches.
+// It is an alias of the shared contract so the HTTP layer can decode it
+// directly while the answer layer converts it to retriever options.
+type Filter = document.MetadataFilter
 
 // RefusalAnswer is deliberately stable so every insufficient-context and
 // dependency-failure path has the same product semantics.
@@ -42,9 +52,10 @@ type Answer struct {
 	Sources    []AnswerSource `json:"sources"`
 }
 
-// Invoker is the narrow hand-off implemented by Chain.
+// Invoker is the narrow hand-off implemented by Chain; retrieval options
+// such as a metadata filter travel through it verbatim.
 type Invoker interface {
-	Invoke(context.Context, string) (Result, error)
+	Invoke(context.Context, string, ...einoretriever.Option) (Result, error)
 }
 
 // AnswerService owns refusal normalization and citation validation. It does
@@ -62,8 +73,10 @@ func NewAnswerService(chain Invoker) (*AnswerService, error) {
 
 // AnswerQuestion always returns a safe product result. Internal dependency or
 // model errors are returned alongside the refusal so callers can log them
-// without exposing them. Context cancellation is preserved for transport.
-func (s *AnswerService) AnswerQuestion(ctx context.Context, question string) (Answer, error) {
+// without exposing them. Context cancellation is preserved for transport. A
+// non-empty filter narrows retrieval to documents with matching front matter;
+// an empty filter changes nothing.
+func (s *AnswerService) AnswerQuestion(ctx context.Context, question string, filter Filter) (Answer, error) {
 	if err := ctx.Err(); err != nil {
 		return Answer{}, err
 	}
@@ -71,11 +84,18 @@ func (s *AnswerService) AnswerQuestion(ctx context.Context, question string) (An
 	if question == "" {
 		return Answer{}, errors.New("rag: question is empty")
 	}
+	if err := filter.Validate(); err != nil {
+		return Answer{}, fmt.Errorf("rag: invalid filter: %w", err)
+	}
 	if isUnderspecifiedQuestion(question) {
 		return refusal(), nil
 	}
 
-	result, err := s.chain.Invoke(ctx, question)
+	var options []einoretriever.Option
+	if !filter.Empty() {
+		options = append(options, queryretriever.WithFilter(filter))
+	}
+	result, err := s.chain.Invoke(ctx, question, options...)
 	if err != nil {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return Answer{}, ctxErr

@@ -54,6 +54,14 @@ curl -X POST http://localhost:8080/api/v1/questions \
   -d '{"question":"知识库中的事务边界是什么？"}'
 ```
 
+可选的 `filter` 字段把检索限定在指定元数据的文档上（见“元数据过滤”）：
+
+```shell
+curl -X POST http://localhost:8080/api/v1/questions \
+  -H "Content-Type: application/json" \
+  -d '{"question":"bff 的加密优化做了什么？","filter":{"metadata":{"category":"ccnubox","module":"bff"},"tags":["ccnubox/bff"]}}'
+```
+
 `/healthz` 只表示进程存活。`/readyz` 只有在 PostgreSQL 可用、`vector` 扩展存在、Ollama 可用、Embedding 模型与数据库向量维度一致，且回答 provider（Ollama 模型列表或 OpenAI-compatible `/models`）可验证时才成功。依赖不可用时问答接口不会回退到模型自身知识。
 
 ## 配置
@@ -115,6 +123,37 @@ Embedding 模型固定为 `qwen3-embedding:0.6b`，不通过配置覆盖；`embe
 
 1. 该开关只影响查询侧，且父文档模式下 `retrieval.max_context` 限制的是父文档（整篇文档）数量，提示词占用会明显增大，建议按文档平均长度适当调低。
 2. 对启用前已索引的文档，需要执行一次 `indexer reindex-all` 补写父文档内容；未补写的文档在父文档模式下会被跳过，若所有命中文档都没有父内容则返回拒答。
+
+### 元数据过滤（Metadata Filtering）
+
+索引器会解析文档头部的 front matter：`key: value` 形式的标量键、以及块式列表（当前主要用于 `tags`）。激活版本时，标量键存入 `documents.metadata` JSONB 列，`tags` 列表存入专用 `tags` 数组列，两者都在激活事务内与版本一起提交。
+
+```yaml
+---
+category: ccnubox
+type: optimization
+topic: crypto
+module: bff
+status: done
+tags:
+  - ccnubox
+  - ccnubox/bff
+---
+```
+
+检索侧通过请求体中可选的 `filter` 字段做元数据过滤，对向量检索（pgvector `@>` JSONB 包含）、BM25 检索（bluge 关键词项）和 RRF 融合一致生效；启用父文档检索时同样先过滤子 Chunk，再展开父文档：
+
+- `filter.metadata`：键值对全部精确匹配（合取）；
+- `filter.tags`：任意一个标签命中即通过（any-of 重叠）；
+- 两组条件同时给出时先各自满足再相交；
+- `filter` 缺省、为 `null` 或为空对象时行为与旧版完全一致；
+- 过滤条件非法（空键/空值、超过 16 个键或 32 个标签、单值超过 256 字符）返回 400 `invalid_filter`。
+
+运维注意：
+
+1. 该功能之前已索引的文档没有元数据行（等价于 `{}`），任何非空过滤都会把它们排除；执行一次 `indexer reindex-all` 可补全。
+2. BM25 是本地磁盘索引，启用过 BM25 的旧索引里没有元数据字段，过滤时同样需要 `reindex-all` 重建。
+3. front matter 支持标量与块式列表（`key:` 后跟缩进的 `- item` 行）；行内数组（`tags: [a, b]`）会按标量原样存储，不参与标签过滤。空列表项（如 `- `）视为非法，索引该文档时会失败并记录原因。
 
 ## 端到端评测
 

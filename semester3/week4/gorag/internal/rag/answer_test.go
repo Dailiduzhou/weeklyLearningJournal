@@ -5,17 +5,23 @@ import (
 	"errors"
 	"testing"
 
+	einoretriever "github.com/cloudwego/eino/components/retriever"
+
 	"github.com/cloudwego/eino/schema"
+
+	queryretriever "gorag/internal/retriever"
 )
 
 type stubInvoker struct {
-	result Result
-	err    error
-	called bool
+	result  Result
+	err     error
+	called  bool
+	options []einoretriever.Option
 }
 
-func (s *stubInvoker) Invoke(context.Context, string) (Result, error) {
+func (s *stubInvoker) Invoke(_ context.Context, _ string, opts ...einoretriever.Option) (Result, error) {
 	s.called = true
+	s.options = append([]einoretriever.Option(nil), opts...)
 	return s.result, s.err
 }
 
@@ -91,7 +97,7 @@ func TestAnswerServiceNormalizesFailuresToRefusal(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	answer, gotErr := service.AnswerQuestion(context.Background(), "question")
+	answer, gotErr := service.AnswerQuestion(context.Background(), "question", Filter{})
 	if !errors.Is(gotErr, dependencyErr) {
 		t.Fatalf("error = %v, want wrapped dependency error", gotErr)
 	}
@@ -106,7 +112,7 @@ func TestAnswerServiceInvalidModelCitationBecomesRefusal(t *testing.T) {
 		Sources: []Source{{ID: "S1"}},
 	}}
 	service, _ := NewAnswerService(chain)
-	answer, err := service.AnswerQuestion(context.Background(), "question")
+	answer, err := service.AnswerQuestion(context.Background(), "question", Filter{})
 	if err != nil || answer.Answerable || answer.Text != RefusalAnswer {
 		t.Fatalf("AnswerQuestion() = %#v, %v", answer, err)
 	}
@@ -115,7 +121,7 @@ func TestAnswerServiceInvalidModelCitationBecomesRefusal(t *testing.T) {
 func TestAnswerServiceInsufficientContextIsNormalRefusal(t *testing.T) {
 	chain := &stubInvoker{err: ErrInsufficientContext}
 	service, _ := NewAnswerService(chain)
-	answer, err := service.AnswerQuestion(context.Background(), "question")
+	answer, err := service.AnswerQuestion(context.Background(), "question", Filter{})
 	if err != nil || answer.Answerable || answer.Text != RefusalAnswer {
 		t.Fatalf("AnswerQuestion() = %#v, %v", answer, err)
 	}
@@ -124,7 +130,7 @@ func TestAnswerServiceInsufficientContextIsNormalRefusal(t *testing.T) {
 func TestAnswerServiceRejectsUnderspecifiedQuestionBeforeRetrieval(t *testing.T) {
 	chain := &stubInvoker{}
 	service, _ := NewAnswerService(chain)
-	answer, err := service.AnswerQuestion(context.Background(), "它要怎么处理？")
+	answer, err := service.AnswerQuestion(context.Background(), "它要怎么处理？", Filter{})
 	if err != nil || answer.Answerable || answer.Text != RefusalAnswer {
 		t.Fatalf("AnswerQuestion() = %#v, %v", answer, err)
 	}
@@ -138,11 +144,53 @@ func TestAnswerServicePropagatesCancellation(t *testing.T) {
 	service, _ := NewAnswerService(chain)
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
-	_, err := service.AnswerQuestion(ctx, "question")
+	_, err := service.AnswerQuestion(ctx, "question", Filter{})
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("error = %v, want context.Canceled", err)
 	}
 	if chain.called {
 		t.Fatal("chain called after context cancellation")
+	}
+}
+
+func TestAnswerQuestionForwardsMetadataFilterAsRetrieverOption(t *testing.T) {
+	chain := &stubInvoker{result: Result{
+		Message:         &schema.Message{Content: "答案 [S1]。"},
+		Sources:         []Source{{ID: "S1", SourcePath: "docs/a.md", DocumentTitle: "A", HeadingPath: []string{"H"}, StartLine: 2, EndLine: 4}},
+		SourceDocuments: map[string]*schema.Document{"S1": {}},
+	}}
+	service, err := NewAnswerService(chain)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// An empty filter must not add options: retrieval behaviour is unchanged.
+	if _, err := service.AnswerQuestion(context.Background(), "question", Filter{}); err != nil {
+		t.Fatalf("AnswerQuestion(empty filter) error = %v", err)
+	}
+	if len(chain.options) != 0 {
+		t.Fatalf("chain options = %d, want none for an empty filter", len(chain.options))
+	}
+
+	filter := Filter{Metadata: map[string]string{"category": "ccnubox"}, Tags: []string{"ccnubox/bff"}}
+	answer, err := service.AnswerQuestion(context.Background(), "question", filter)
+	if err != nil {
+		t.Fatalf("AnswerQuestion(filter) error = %v", err)
+	}
+	if !answer.Answerable {
+		t.Fatalf("AnswerQuestion(filter) = %#v, want a grounded answer", answer)
+	}
+	extracted, err := queryretriever.FilterFromOptions(chain.options...)
+	if err != nil {
+		t.Fatalf("FilterFromOptions() error = %v", err)
+	}
+	if extracted.Metadata["category"] != "ccnubox" || extracted.Tags[0] != "ccnubox/bff" {
+		t.Fatalf("forwarded filter = %#v, want the caller's filter", extracted)
+	}
+
+	// A malformed filter is rejected before the chain runs.
+	invalid := Filter{Tags: []string{" "}}
+	if _, err := service.AnswerQuestion(context.Background(), "question", invalid); err == nil {
+		t.Fatal("AnswerQuestion(invalid filter) error = nil")
 	}
 }

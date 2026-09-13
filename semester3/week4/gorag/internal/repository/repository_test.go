@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
@@ -131,5 +132,50 @@ func TestCanonicalParentIDs(t *testing.T) {
 	}
 	if canonical, err := canonicalParentIDs(limit); err != nil || len(canonical) != MaxParentBatchSize {
 		t.Fatalf("canonicalParentIDs(limit) = %d ids, error %v, want exactly the limit", len(canonical), err)
+	}
+}
+
+func TestActivationMetadataJSON(t *testing.T) {
+	t.Parallel()
+
+	if got := string(activationMetadataJSON(document.DocumentMetadata{})); got != "{}" {
+		t.Fatalf("activationMetadataJSON(empty) = %s, want {}", got)
+	}
+	metadata := document.DocumentMetadata{
+		Scalars: map[string]string{"category": "ccnubox", "module": "bff"},
+		Lists: map[string][]string{
+			"tags": {"ccnubox", "ccnubox/bff"},
+			"refs": {"api/auth.md"},
+		},
+	}
+	encoded := string(activationMetadataJSON(metadata))
+	decoded := map[string]any{}
+	if err := json.Unmarshal([]byte(encoded), &decoded); err != nil {
+		t.Fatalf("activationMetadataJSON produced invalid JSON %q: %v", encoded, err)
+	}
+	if decoded["category"] != "ccnubox" || decoded["module"] != "bff" {
+		t.Fatalf("activationMetadataJSON = %s, want scalar keys preserved", encoded)
+	}
+	// The tags list lives in the dedicated array column, never in the JSONB.
+	if _, exists := decoded[document.TagsKey]; exists {
+		t.Fatalf("activationMetadataJSON = %s, tags must be excluded", encoded)
+	}
+	refs, ok := decoded["refs"].([]any)
+	if !ok || len(refs) != 1 || refs[0] != "api/auth.md" {
+		t.Fatalf("activationMetadataJSON = %s, want other lists stored as arrays", encoded)
+	}
+}
+
+func TestActivationTags(t *testing.T) {
+	t.Parallel()
+
+	if got := activationTags(document.DocumentMetadata{}); len(got) != 0 {
+		t.Fatalf("activationTags(empty) = %#v, want an empty non-nil array", got)
+	}
+	metadata := document.DocumentMetadata{Lists: map[string][]string{
+		document.TagsKey: {"ccnubox/bff"},
+	}}
+	if got := activationTags(metadata); len(got) != 1 || got[0] != "ccnubox/bff" {
+		t.Fatalf("activationTags = %#v, want the parsed tag list", got)
 	}
 }

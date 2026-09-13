@@ -10,6 +10,9 @@ import (
 	"github.com/cloudwego/eino/components/model"
 	einoretriever "github.com/cloudwego/eino/components/retriever"
 	"github.com/cloudwego/eino/schema"
+
+	"gorag/internal/document"
+	queryretriever "gorag/internal/retriever"
 )
 
 func TestChainInvokesGroundedEinoGenerationAndReturnsSources(t *testing.T) {
@@ -121,12 +124,14 @@ func TestChainWrapsGenerationFailure(t *testing.T) {
 type stubRetriever struct {
 	documents []*schema.Document
 	err       error
+	options   []einoretriever.Option
 }
 
-func (r *stubRetriever) Retrieve(ctx context.Context, _ string, _ ...einoretriever.Option) ([]*schema.Document, error) {
+func (r *stubRetriever) Retrieve(ctx context.Context, _ string, opts ...einoretriever.Option) ([]*schema.Document, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	r.options = append([]einoretriever.Option(nil), opts...)
 	return r.documents, r.err
 }
 
@@ -162,4 +167,35 @@ func (m *recordingModel) snapshot() ([]*schema.Message, int) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	return append([]*schema.Message(nil), m.messages...), m.calls
+}
+
+// TestChainForwardsRetrieverOptions ensures retrieval options such as a
+// metadata filter reach the retriever untouched.
+func TestChainForwardsRetrieverOptions(t *testing.T) {
+	retrieval := &stubRetriever{documents: []*schema.Document{retrievalDocument("doc", "guide.md", 0, 0.9)}}
+	chatModel := &recordingModel{response: schema.AssistantMessage("Use the guide [S1].", nil)}
+	builder, err := NewContextBuilder(5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	chain, err := NewChain(context.Background(), retrieval, builder, nil, chatModel)
+	if err != nil {
+		t.Fatalf("NewChain() error = %v", err)
+	}
+
+	filter := document.MetadataFilter{Metadata: map[string]string{"category": "ccnubox"}}
+	option := queryretriever.WithFilter(filter)
+	if _, err := chain.Invoke(context.Background(), "question", option); err != nil {
+		t.Fatalf("Invoke(options) error = %v", err)
+	}
+	if len(retrieval.options) != 1 {
+		t.Fatalf("retriever options = %d, want the forwarded option", len(retrieval.options))
+	}
+	extracted, err := queryretriever.FilterFromOptions(retrieval.options...)
+	if err != nil {
+		t.Fatalf("FilterFromOptions() error = %v", err)
+	}
+	if extracted.Metadata["category"] != "ccnubox" {
+		t.Fatalf("forwarded filter = %#v, want the caller's filter", extracted)
+	}
 }

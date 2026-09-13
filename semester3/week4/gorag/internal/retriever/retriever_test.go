@@ -136,14 +136,16 @@ type vectorCandidate struct {
 type cosineStore struct {
 	candidates []vectorCandidate
 	limit      int
+	filter     document.MetadataFilter
 	err        error
 }
 
-func (s *cosineStore) Search(ctx context.Context, query []float32, limit int) ([]repository.SearchResult, error) {
+func (s *cosineStore) Search(ctx context.Context, query []float32, limit int, filter document.MetadataFilter) ([]repository.SearchResult, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	s.limit = limit
+	s.filter = filter
 	if s.err != nil {
 		return nil, s.err
 	}

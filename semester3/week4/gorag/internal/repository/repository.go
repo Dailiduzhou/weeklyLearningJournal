@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path"
@@ -13,6 +14,7 @@ import (
 	pgvector "github.com/pgvector/pgvector-go"
 	pgxvector "github.com/pgvector/pgvector-go/pgx"
 
+	"gorag/internal/document"
 	"gorag/internal/embedding"
 )
 
@@ -249,8 +251,10 @@ func (r *Repository) ActivateVersion(ctx context.Context, activation Activation)
 	command, err := tx.Exec(ctx, `
 		UPDATE documents
 		SET current_version = $2, status = 'active', title = $3, content_hash = $4,
-		    indexed_at = now(), updated_at = now()
-		WHERE id = $1`, activation.DocumentID, activation.Version, activation.Title, activation.ContentHash)
+		    metadata = $5::jsonb, tags = $6, indexed_at = now(), updated_at = now()
+		WHERE id = $1`,
+		activation.DocumentID, activation.Version, activation.Title, activation.ContentHash,
+		activationMetadataJSON(activation.Metadata), activationTags(activation.Metadata))
 	if err != nil {
 		return fmt.Errorf("repository: activate document %d version %q: %w", activation.DocumentID, activation.Version, err)
 	}
@@ -309,15 +313,20 @@ func (r *Repository) DeleteInactiveVersions(ctx context.Context, documentID int6
 }
 
 // Search returns the limit most cosine-similar chunks of active documents at
-// their current version.
-func (r *Repository) Search(ctx context.Context, queryVector []float32, limit int) ([]SearchResult, error) {
+// their current version. A non-empty document.MetadataFilter additionally
+// requires every named metadata key to match exactly and at least one of the
+// given tags to be present.
+func (r *Repository) Search(ctx context.Context, queryVector []float32, limit int, filter document.MetadataFilter) ([]SearchResult, error) {
 	if len(queryVector) != embedding.VectorDimension {
 		return nil, fmt.Errorf("repository: query vector dimension %d, want %d", len(queryVector), embedding.VectorDimension)
 	}
 	if limit <= 0 {
 		return nil, errors.New("repository: search limit must be positive")
 	}
-	rows, err := r.pool.Query(ctx, `
+	if err := filter.Validate(); err != nil {
+		return nil, fmt.Errorf("repository: search filter: %w", err)
+	}
+	query := `
 		SELECT chunks.document_id, documents.source_path, documents.title,
 		       chunks.document_version, chunks.chunk_index, chunks.content,
 		       chunks.heading_path, chunks.start_line, chunks.end_line,
@@ -326,9 +335,23 @@ func (r *Repository) Search(ctx context.Context, queryVector []float32, limit in
 		FROM document_chunks chunks
 		JOIN documents ON documents.id = chunks.document_id
 		              AND documents.current_version = chunks.document_version
-		WHERE documents.status = 'active'
-		ORDER BY chunks.embedding <=> $1
-		LIMIT $2`, pgvector.NewVector(queryVector), limit)
+		WHERE documents.status = 'active'`
+	args := []any{pgvector.NewVector(queryVector), limit}
+	if len(filter.Metadata) > 0 {
+		encoded, err := json.Marshal(filter.Metadata)
+		if err != nil {
+			return nil, fmt.Errorf("repository: encode metadata filter: %w", err)
+		}
+		args = append(args, string(encoded))
+		query += fmt.Sprintf("\n\t\t  AND documents.metadata @> $%d::jsonb", len(args))
+	}
+	if len(filter.Tags) > 0 {
+		args = append(args, filter.Tags)
+		query += fmt.Sprintf("\n\t\t  AND documents.tags && $%d::text[]", len(args))
+	}
+	query += "\n\t\tORDER BY chunks.embedding <=> $1\n\t\tLIMIT $2"
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("repository: vector search: %w", err)
 	}
@@ -481,6 +504,9 @@ func validateActivation(activation Activation) error {
 		return fmt.Errorf("repository: activation parent line range %d..%d is invalid",
 			activation.Parent.StartLine, activation.Parent.EndLine)
 	}
+	if err := activation.Metadata.Validate(); err != nil {
+		return fmt.Errorf("repository: activation metadata: %w", err)
+	}
 	return nil
 }
 
@@ -510,6 +536,41 @@ func validateVersionChunk(chunk VersionChunk, version string) error {
 		return fmt.Errorf("chunk %d vector dimension %d, want %d", chunk.Index, len(chunk.Embedding), embedding.VectorDimension)
 	}
 	return nil
+}
+
+// activationMetadataJSON merges scalar front matter and list-valued keys into
+// the JSONB object stored on documents. The tags list is excluded: it lives in
+// the dedicated tags column instead.
+func activationMetadataJSON(metadata document.DocumentMetadata) []byte {
+	merged := make(map[string]any, len(metadata.Scalars)+len(metadata.Lists))
+	for key, value := range metadata.Scalars {
+		merged[key] = value
+	}
+	for key, items := range metadata.Lists {
+		if key == document.TagsKey {
+			continue
+		}
+		merged[key] = items
+	}
+	if len(merged) == 0 {
+		return []byte("{}")
+	}
+	encoded, err := json.Marshal(merged)
+	if err != nil {
+		// map[string]any of strings and string slices cannot fail to marshal.
+		return []byte("{}")
+	}
+	return encoded
+}
+
+// activationTags returns the tag list for the dedicated array column. nil
+// maps encode as an empty array, satisfying the NOT NULL column default.
+func activationTags(metadata document.DocumentMetadata) []string {
+	tags := metadata.Tags()
+	if len(tags) == 0 {
+		return []string{}
+	}
+	return tags
 }
 
 func nullableInt(value *int) any {

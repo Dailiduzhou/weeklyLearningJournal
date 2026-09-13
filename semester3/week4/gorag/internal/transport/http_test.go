@@ -12,10 +12,10 @@ import (
 	"gorag/internal/rag"
 )
 
-type answererFunc func(context.Context, string) (rag.Answer, error)
+type answererFunc func(context.Context, string, rag.Filter) (rag.Answer, error)
 
-func (f answererFunc) AnswerQuestion(ctx context.Context, question string) (rag.Answer, error) {
-	return f(ctx, question)
+func (f answererFunc) AnswerQuestion(ctx context.Context, question string, filter rag.Filter) (rag.Answer, error) {
+	return f(ctx, question, filter)
 }
 
 type checkerFunc func(context.Context) error
@@ -23,7 +23,7 @@ type checkerFunc func(context.Context) error
 func (f checkerFunc) Check(ctx context.Context) error { return f(ctx) }
 
 func TestQuestionHandlerSuccess(t *testing.T) {
-	answerer := answererFunc(func(_ context.Context, question string) (rag.Answer, error) {
+	answerer := answererFunc(func(_ context.Context, question string, _ rag.Filter) (rag.Answer, error) {
 		if question != "问题" {
 			t.Fatalf("question = %q", question)
 		}
@@ -48,7 +48,7 @@ func TestQuestionHandlerSuccess(t *testing.T) {
 
 func TestQuestionHandlerValidation(t *testing.T) {
 	called := false
-	answerer := answererFunc(func(context.Context, string) (rag.Answer, error) {
+	answerer := answererFunc(func(context.Context, string, rag.Filter) (rag.Answer, error) {
 		called = true
 		return rag.Answer{}, nil
 	})
@@ -81,7 +81,7 @@ func TestQuestionHandlerValidation(t *testing.T) {
 }
 
 func TestQuestionHandlerDependencyFailureReturnsSafeRefusal(t *testing.T) {
-	answerer := answererFunc(func(context.Context, string) (rag.Answer, error) {
+	answerer := answererFunc(func(context.Context, string, rag.Filter) (rag.Answer, error) {
 		return rag.Answer{}, errors.New("postgres password secret")
 	})
 	handler := NewHandler(answerer, nil, nil)
@@ -93,7 +93,7 @@ func TestQuestionHandlerDependencyFailureReturnsSafeRefusal(t *testing.T) {
 }
 
 func TestQuestionHandlerCancelledContext(t *testing.T) {
-	answerer := answererFunc(func(ctx context.Context, _ string) (rag.Answer, error) {
+	answerer := answererFunc(func(ctx context.Context, _ string, _ rag.Filter) (rag.Answer, error) {
 		return rag.Answer{}, ctx.Err()
 	})
 	handler := NewHandler(answerer, nil, nil)
@@ -139,5 +139,67 @@ func TestQuestionMethodNotAllowed(t *testing.T) {
 	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/api/v1/questions", nil))
 	if response.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("status = %d, want 405", response.Code)
+	}
+}
+
+func TestQuestionHandlerAcceptsAndForwardsMetadataFilter(t *testing.T) {
+	var received rag.Filter
+	answerer := answererFunc(func(_ context.Context, question string, filter rag.Filter) (rag.Answer, error) {
+		received = filter
+		return rag.Answer{Answerable: true, Text: "答案 [S1]", Sources: []rag.AnswerSource{{ID: "S1"}}}, nil
+	})
+	handler := NewHandler(answerer, checkerFunc(func(context.Context) error { return nil }), nil)
+	body := `{"question":"bff 的加密优化","filter":{"metadata":{"category":"ccnubox","module":"bff"},"tags":["ccnubox/bff"]}}`
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/questions", strings.NewReader(body))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if received.Metadata["category"] != "ccnubox" || received.Metadata["module"] != "bff" ||
+		len(received.Tags) != 1 || received.Tags[0] != "ccnubox/bff" {
+		t.Fatalf("forwarded filter = %#v, want the decoded request filter", received)
+	}
+
+	// Absent and null filters decode to the empty filter and pass validation.
+	for _, body := range []string{`{"question":"问题"}`, `{"question":"问题","filter":null}`} {
+		response := httptest.NewRecorder()
+		handler.ServeHTTP(response, httptest.NewRequest(http.MethodPost, "/api/v1/questions", strings.NewReader(body)))
+		if response.Code != http.StatusOK {
+			t.Fatalf("body %s: status = %d", body, response.Code)
+		}
+		if !received.Empty() {
+			t.Fatalf("body %s: filter = %#v, want empty", body, received)
+		}
+	}
+}
+
+func TestQuestionHandlerRejectsInvalidMetadataFilter(t *testing.T) {
+	called := false
+	answerer := answererFunc(func(context.Context, string, rag.Filter) (rag.Answer, error) {
+		called = true
+		return rag.Answer{}, nil
+	})
+	handler := NewHandler(answerer, checkerFunc(func(context.Context) error { return nil }), nil)
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/questions",
+		strings.NewReader(`{"question":"问题","filter":{"metadata":{"category":" "}}}`))
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if !strings.Contains(response.Body.String(), "invalid_filter") || called {
+		t.Fatalf("response = %s, answerer called = %v, want invalid_filter without calling the answerer", response.Body.String(), called)
+	}
+
+	// Unknown filter fields are still rejected by DisallowUnknownFields.
+	request = httptest.NewRequest(http.MethodPost, "/api/v1/questions",
+		strings.NewReader(`{"question":"问题","filter":{"metadata":{"category":"ccnubox"},"source_path":"api/auth.md"}}`))
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || !strings.Contains(response.Body.String(), "invalid_json") {
+		t.Fatalf("status = %d, body = %s, want invalid_json for unknown filter fields", response.Code, response.Body.String())
 	}
 }

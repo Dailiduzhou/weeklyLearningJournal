@@ -12,6 +12,7 @@ import (
 	einoretriever "github.com/cloudwego/eino/components/retriever"
 	"github.com/cloudwego/eino/schema"
 
+	"gorag/internal/document"
 	"gorag/internal/embedding"
 	"gorag/internal/repository"
 )
@@ -69,7 +70,7 @@ type repositorySearchResult = repository.SearchResult
 // Searcher is implemented by repository.Repository. Its contract requires
 // active documents at their current version only.
 type Searcher interface {
-	Search(context.Context, []float32, int) ([]repository.SearchResult, error)
+	Search(context.Context, []float32, int, document.MetadataFilter) ([]repository.SearchResult, error)
 }
 
 // PgVectorRetriever adapts the local query embedder and repository search to
@@ -120,6 +121,10 @@ func (r *PgVectorRetriever) Retrieve(ctx context.Context, query string, opts ...
 	if err := validateLimits(*options.TopK, *options.ScoreThreshold); err != nil {
 		return nil, err
 	}
+	filter, err := FilterFromOptions(opts...)
+	if err != nil {
+		return nil, err
+	}
 
 	queryVector, err := r.embedder.EmbedQuery(ctx, query)
 	if err != nil {
@@ -128,7 +133,7 @@ func (r *PgVectorRetriever) Retrieve(ctx context.Context, query string, opts ...
 	if len(queryVector) != embedding.VectorDimension {
 		return nil, fmt.Errorf("%w: vector dimension %d, want %d", ErrEmbedding, len(queryVector), embedding.VectorDimension)
 	}
-	results, err := r.searcher.Search(ctx, queryVector, *options.TopK)
+	results, err := r.searcher.Search(ctx, queryVector, *options.TopK, filter)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSearch, err)
 	}

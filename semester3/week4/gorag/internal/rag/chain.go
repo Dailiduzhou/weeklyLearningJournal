@@ -72,7 +72,9 @@ func NewChain(ctx context.Context, retriever einoretriever.Retriever, builder *C
 
 // Invoke runs retrieval, context building, prompt formatting, and model
 // generation with the same Context. No-context outcomes stop before the model.
-func (c *Chain) Invoke(ctx context.Context, question string) (Result, error) {
+// Retrieval options, such as retriever.WithFilter, are forwarded verbatim to
+// the retriever.
+func (c *Chain) Invoke(ctx context.Context, question string, options ...einoretriever.Option) (Result, error) {
 	if err := ctx.Err(); err != nil {
 		return Result{}, err
 	}
@@ -81,7 +83,7 @@ func (c *Chain) Invoke(ctx context.Context, question string) (Result, error) {
 		return Result{}, fmt.Errorf("%w: question is empty", ErrInvalidChain)
 	}
 
-	documents, err := c.retriever.Retrieve(ctx, question)
+	documents, err := c.retriever.Retrieve(ctx, question, options...)
 	if err != nil {
 		return Result{}, err
 	}

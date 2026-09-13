@@ -17,7 +17,7 @@ import (
 const DefaultMaxRequestBytes int64 = 1 << 20
 
 type Answerer interface {
-	AnswerQuestion(context.Context, string) (rag.Answer, error)
+	AnswerQuestion(context.Context, string, rag.Filter) (rag.Answer, error)
 }
 
 type ReadyChecker interface {
@@ -81,7 +81,8 @@ func (a *API) question(w http.ResponseWriter, request *http.Request) {
 	decoder := json.NewDecoder(request.Body)
 	decoder.DisallowUnknownFields()
 	var input struct {
-		Question string `json:"question"`
+		Question string     `json:"question"`
+		Filter   rag.Filter `json:"filter"`
 	}
 	if err := decoder.Decode(&input); err != nil {
 		var tooLarge *http.MaxBytesError
@@ -106,12 +107,16 @@ func (a *API) question(w http.ResponseWriter, request *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "empty_question", "question 不能为空")
 		return
 	}
+	if err := input.Filter.Validate(); err != nil {
+		writeProblem(w, http.StatusBadRequest, "invalid_filter", "filter 元数据约束不合法")
+		return
+	}
 	if err := request.Context().Err(); err != nil {
 		writeProblem(w, http.StatusRequestTimeout, "request_cancelled", "请求已取消或超时")
 		return
 	}
 
-	answer, err := a.answerer.AnswerQuestion(request.Context(), input.Question)
+	answer, err := a.answerer.AnswerQuestion(request.Context(), input.Question, input.Filter)
 	if ctxErr := request.Context().Err(); ctxErr != nil || errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		writeProblem(w, http.StatusRequestTimeout, "request_cancelled", "请求已取消或超时")
 		return

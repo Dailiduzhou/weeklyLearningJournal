@@ -623,3 +623,51 @@ func (s *memoryStore) FailIndexRun(ctx context.Context, runID int64, documents, 
 	s.runs[runID-1].ErrorMessage = &message
 	return nil
 }
+
+func TestSyncStoresFrontMatterMetadataWithActivation(t *testing.T) {
+	ctx := context.Background()
+	loader := &fakeLoader{documents: []document.Document{{
+		SourcePath: "api/auth.md", Title: "api/auth.md", Kind: document.KindMarkdown,
+		Content: "---\ncategory: ccnubox\ntype: optimization\ntopic: crypto\nmodule: bff\nstatus: done\ntags:\n  - ccnubox\n  - ccnubox/bff\n---\n\n# Auth\n\nBody", ContentHash: "hash-v1",
+	}}}
+	store := newMemoryStore()
+	indexer := newTestIndexer(t, loader, store, nil)
+
+	if _, err := indexer.Sync(ctx); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if len(store.activations) != 1 {
+		t.Fatalf("activations recorded = %d, want 1", len(store.activations))
+	}
+	metadata := store.activations[0].Metadata
+	if metadata.Scalars["category"] != "ccnubox" || metadata.Scalars["module"] != "bff" || metadata.Scalars["status"] != "done" {
+		t.Fatalf("activation scalars = %#v, want the parsed front matter", metadata.Scalars)
+	}
+	if tags := metadata.Tags(); len(tags) != 2 || tags[0] != "ccnubox" || tags[1] != "ccnubox/bff" {
+		t.Fatalf("activation tags = %#v, want the parsed tag list", tags)
+	}
+}
+
+func TestSyncRejectsMalformedFrontMatterBeforeEmbedding(t *testing.T) {
+	ctx := context.Background()
+	// An empty list item is malformed and must fail the document before any
+	// embedding work happens.
+	loader := &fakeLoader{documents: []document.Document{{
+		SourcePath: "bad.md", Title: "bad.md", Kind: document.KindMarkdown,
+		Content: "---\ntags:\n  - \n---\n\n# Bad\n\nBody", ContentHash: "hash-v1",
+	}}}
+	store := newMemoryStore()
+	embedder := &fakeEmbedder{}
+	indexer := newTestIndexer(t, loader, store, embedder)
+
+	result, err := indexer.Sync(ctx)
+	if err == nil || result.Failed != 1 || result.Skipped != 0 {
+		t.Fatalf("Sync() = %#v, error %v, want one failed document", result, err)
+	}
+	if embedder.callCount() != 0 {
+		t.Fatalf("embedder calls = %d, want zero: malformed metadata must fail before embedding", embedder.callCount())
+	}
+	if len(store.activations) != 0 || store.insertCalls != 0 {
+		t.Fatalf("store was written: activations %d, inserts %d", len(store.activations), store.insertCalls)
+	}
+}

@@ -16,16 +16,17 @@ type fakeBM25Searcher struct {
 	err     error
 	query   string
 	topK    int
+	filter  document.MetadataFilter
 }
 
-func (s *fakeBM25Searcher) Search(ctx context.Context, query string, topK int) ([]bm25.SearchResult, error) {
+func (s *fakeBM25Searcher) Search(ctx context.Context, query string, topK int, filter document.MetadataFilter) ([]bm25.SearchResult, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 	if s.err != nil {
 		return nil, s.err
 	}
-	s.query, s.topK = query, topK
+	s.query, s.topK, s.filter = query, topK, filter
 	return append([]bm25.SearchResult(nil), s.results...), nil
 }
 

@@ -31,6 +31,10 @@ const (
 	FieldChunkIndex  = "chunk_index"
 	FieldStartLine   = "start_line"
 	FieldEndLine     = "end_line"
+	// FieldMetaPrefix namespaces front-matter keys so document filters can
+	// term-match them without colliding with pipeline fields. List-valued keys
+	// contribute one term per item, so tag filters use any-of semantics.
+	FieldMetaPrefix = "meta_"
 )
 
 // TitleBoost biases title matches above ordinary content matches.
@@ -84,8 +88,9 @@ func (i *Index) Close() error {
 
 // IndexChunks atomically replaces all stored chunks of one document with the
 // supplied version's chunks. Chunks must already carry their document ID and
-// version, matching the repository contract.
-func (i *Index) IndexChunks(ctx context.Context, docID, version string, chunks []document.Chunk) error {
+// version, matching the repository contract. The document's parsed front
+// matter is stored on every chunk as filterable keyword terms.
+func (i *Index) IndexChunks(ctx context.Context, docID, version string, chunks []document.Chunk, metadata document.DocumentMetadata) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -98,6 +103,9 @@ func (i *Index) IndexChunks(ctx context.Context, docID, version string, chunks [
 	if len(chunks) == 0 {
 		return fmt.Errorf("%w: no chunks supplied for document %q", ErrInvalidConfig, docID)
 	}
+	if err := metadata.Validate(); err != nil {
+		return fmt.Errorf("%w: document %q metadata: %w", ErrInvalidConfig, docID, err)
+	}
 
 	batch := bluge.NewBatch()
 	// Old versions of the same document must not survive a new activation.
@@ -109,7 +117,7 @@ func (i *Index) IndexChunks(ctx context.Context, docID, version string, chunks [
 			return fmt.Errorf("%w: chunk %d has ID/version %q/%q, want %q/%q",
 				ErrInvalidConfig, chunk.Index, chunk.DocumentID, chunk.DocumentVersion, docID, version)
 		}
-		batch.Insert(chunkDocument(chunk))
+		batch.Insert(chunkDocument(chunk, metadata))
 	}
 	if err := i.writer.Batch(batch); err != nil {
 		return fmt.Errorf("bm25: index %d chunks for document %q: %w", len(chunks), docID, err)
@@ -140,7 +148,11 @@ func (i *Index) DeleteDocument(ctx context.Context, docID string) error {
 
 // Search returns the topK lexical matches for the query, ranked by BM25
 // score. Both content and title fields are searched; title hits are boosted.
-func (i *Index) Search(ctx context.Context, query string, topK int) ([]SearchResult, error) {
+// A non-empty document.MetadataFilter additionally requires exact metadata
+// term matches and an any-of tag overlap. Chunks indexed before the filter
+// fields existed have no metadata terms, so filters exclude them; rebuild
+// such indexes with indexer reindex-all.
+func (i *Index) Search(ctx context.Context, query string, topK int, filter document.MetadataFilter) ([]SearchResult, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
@@ -153,10 +165,14 @@ func (i *Index) Search(ctx context.Context, query string, topK int) ([]SearchRes
 	if topK <= 0 || topK > 100 {
 		return nil, fmt.Errorf("%w: topK must be between 1 and 100, got %d", ErrInvalidConfig, topK)
 	}
+	if err := filter.Validate(); err != nil {
+		return nil, fmt.Errorf("%w: %w", ErrInvalidConfig, err)
+	}
 
-	contentQuery := bluge.NewMatchQuery(query).SetField(FieldContent)
-	titleQuery := bluge.NewMatchQuery(query).SetField(FieldTitle).SetBoost(TitleBoost)
-	booleanQuery := bluge.NewBooleanQuery().AddShould(contentQuery, titleQuery)
+	booleanQuery := metadataFilterQuery(bluge.NewBooleanQuery().AddShould(
+		bluge.NewMatchQuery(query).SetField(FieldContent),
+		bluge.NewMatchQuery(query).SetField(FieldTitle).SetBoost(TitleBoost),
+	), filter)
 
 	reader, err := i.writer.Reader()
 	if err != nil {
@@ -193,8 +209,8 @@ func chunkIdentifier(docID, version string, chunkIndex int) string {
 	return docID + ":" + version + ":" + strconv.Itoa(chunkIndex)
 }
 
-func chunkDocument(chunk document.Chunk) *bluge.Document {
-	return bluge.NewDocument(chunkIdentifier(chunk.DocumentID, chunk.DocumentVersion, chunk.Index)).
+func chunkDocument(chunk document.Chunk, metadata document.DocumentMetadata) *bluge.Document {
+	documentEntry := bluge.NewDocument(chunkIdentifier(chunk.DocumentID, chunk.DocumentVersion, chunk.Index)).
 		AddField(bluge.NewTextField(FieldContent, chunk.Content).StoreValue()).
 		AddField(bluge.NewKeywordField(FieldTitle, chunk.DocumentTitle).StoreValue()).
 		AddField(bluge.NewKeywordField(FieldDocumentID, chunk.DocumentID).StoreValue()).
@@ -205,6 +221,39 @@ func chunkDocument(chunk document.Chunk) *bluge.Document {
 		AddField(bluge.NewNumericField(FieldChunkIndex, float64(chunk.Index)).StoreValue()).
 		AddField(bluge.NewNumericField(FieldStartLine, float64(chunk.StartLine)).StoreValue()).
 		AddField(bluge.NewNumericField(FieldEndLine, float64(chunk.EndLine)).StoreValue())
+	// Scalar and list-valued front matter become exact keyword terms. List
+	// keys contribute one term per item, which is what tag filters match.
+	for key, value := range metadata.Scalars {
+		documentEntry.AddField(bluge.NewKeywordField(FieldMetaPrefix+key, value).StoreValue())
+	}
+	for key, items := range metadata.Lists {
+		for _, item := range items {
+			documentEntry.AddField(bluge.NewKeywordField(FieldMetaPrefix+key, item).StoreValue())
+		}
+	}
+	return documentEntry
+}
+
+// metadataFilterQuery wraps the relevance query with metadata constraints
+// when a filter is present. The relevance query becomes a must so the text
+// match stays mandatory; bluge must-clauses drive which documents are
+// emitted, while should-clauses only boost scores.
+func metadataFilterQuery(relevance bluge.Query, filter document.MetadataFilter) bluge.Query {
+	if filter.Empty() {
+		return relevance
+	}
+	filtered := bluge.NewBooleanQuery().AddMust(relevance)
+	for key, value := range filter.Metadata {
+		filtered.AddMust(bluge.NewTermQuery(value).SetField(FieldMetaPrefix + key))
+	}
+	if len(filter.Tags) > 0 {
+		tags := bluge.NewBooleanQuery()
+		for _, tag := range filter.Tags {
+			tags.AddShould(bluge.NewTermQuery(tag).SetField(FieldMetaPrefix + document.TagsKey))
+		}
+		filtered.AddMust(tags)
+	}
+	return filtered
 }
 
 func encodeHeadingPath(headingPath []string) string {

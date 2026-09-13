@@ -57,11 +57,12 @@ type Store interface {
 }
 
 // ChunkSink is an optional secondary index (e.g., the bluge BM25 index)
-// mirrored after the repository. It receives every activated chunk version
-// and every document deletion. Implementations must be safe for the indexer's
-// configured document concurrency.
+// mirrored after the repository. It receives every activated chunk version,
+// the document's parsed front matter, and every document deletion.
+// Implementations must be safe for the indexer's configured document
+// concurrency.
 type ChunkSink interface {
-	IndexChunks(ctx context.Context, documentID, version string, chunks []document.Chunk) error
+	IndexChunks(ctx context.Context, documentID, version string, chunks []document.Chunk, metadata document.DocumentMetadata) error
 	DeleteDocument(ctx context.Context, documentID string) error
 }
 
@@ -390,7 +391,14 @@ func (i *Indexer) indexDocument(ctx context.Context, doc document.Document, forc
 	cleaned := cleaner.Clean(doc.Content, cleaner.Options{ParseFrontMatter: true})
 	doc.Content = cleaned.Content
 	doc.FrontMatter = cleaned.FrontMatter
+	doc.FrontMatterLists = cleaned.FrontMatterLists
 	doc.LineNumbers = append([]int(nil), cleaned.LineNumbers...)
+	// Parse and validate the front matter before the expensive embedding step:
+	// metadata failures must fail the document before anything is stored.
+	metadata := document.DocumentMetadata{Scalars: cleaned.FrontMatter, Lists: cleaned.FrontMatterLists}
+	if err := metadata.Validate(); err != nil {
+		return outcomeSkipped, 0, fmt.Errorf("parse front matter: %w", err)
+	}
 	chunks, err := i.splitter.Split(doc)
 	if err != nil {
 		return outcomeSkipped, 0, fmt.Errorf("split document: %w", err)
@@ -435,7 +443,7 @@ func (i *Indexer) indexDocument(ctx context.Context, doc document.Document, forc
 	if err := i.store.ActivateVersion(ctx, repository.Activation{
 		DocumentID: record.ID, Version: version, ExpectedChunkCount: len(storedChunks),
 		Title: doc.Title, ContentHash: doc.ContentHash,
-		Parent: parent,
+		Parent: parent, Metadata: metadata,
 	}); err != nil {
 		return outcomeSkipped, 0, fmt.Errorf("activate version %q: %w", version, err)
 	}
@@ -443,7 +451,7 @@ func (i *Indexer) indexDocument(ctx context.Context, doc document.Document, forc
 		return outcomeSkipped, len(storedChunks), fmt.Errorf("clean inactive versions: %w", err)
 	}
 	if i.chunkSink != nil {
-		if err := i.chunkSink.IndexChunks(ctx, strconv.FormatInt(record.ID, 10), version, chunks); err != nil {
+		if err := i.chunkSink.IndexChunks(ctx, strconv.FormatInt(record.ID, 10), version, chunks, metadata); err != nil {
 			return outcomeSkipped, len(storedChunks), fmt.Errorf("mirror chunk version %q into chunk sink: %w", version, err)
 		}
 	}

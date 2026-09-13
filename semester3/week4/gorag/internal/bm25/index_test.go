@@ -38,11 +38,11 @@ func TestIndexChunksAndSearchReturnStoredMetadata(t *testing.T) {
 	ctx := context.Background()
 	index := openTestIndex(t)
 	chunks := testChunks("7", "version-a")
-	if err := index.IndexChunks(ctx, "7", "version-a", chunks); err != nil {
+	if err := index.IndexChunks(ctx, "7", "version-a", chunks, document.DocumentMetadata{}); err != nil {
 		t.Fatalf("IndexChunks() error = %v", err)
 	}
 
-	results, err := index.Search(ctx, "JWT tokens expire", 10)
+	results, err := index.Search(ctx, "JWT tokens expire", 10, document.MetadataFilter{})
 	if err != nil {
 		t.Fatalf("Search() error = %v", err)
 	}
@@ -77,7 +77,7 @@ func TestIndexChunksAndSearchReturnStoredMetadata(t *testing.T) {
 func TestIndexChunksReplacesPreviousVersion(t *testing.T) {
 	ctx := context.Background()
 	index := openTestIndex(t)
-	if err := index.IndexChunks(ctx, "7", "version-a", testChunks("7", "version-a")); err != nil {
+	if err := index.IndexChunks(ctx, "7", "version-a", testChunks("7", "version-a"), document.DocumentMetadata{}); err != nil {
 		t.Fatalf("IndexChunks() error = %v", err)
 	}
 
@@ -87,12 +87,12 @@ func TestIndexChunksReplacesPreviousVersion(t *testing.T) {
 		Content:   "OAuth device flow is now the recommended flow.",
 		StartLine: 1, EndLine: 5, ContentHash: "hash-2", DocumentVersion: "version-b",
 	}}
-	if err := index.IndexChunks(ctx, "7", "version-b", replacement); err != nil {
+	if err := index.IndexChunks(ctx, "7", "version-b", replacement, document.DocumentMetadata{}); err != nil {
 		t.Fatalf("IndexChunks() error = %v", err)
 	}
 
 	for _, query := range []string{"JWT tokens expire", "OAuth device flow"} {
-		results, err := index.Search(ctx, query, 10)
+		results, err := index.Search(ctx, query, 10, document.MetadataFilter{})
 		if err != nil {
 			t.Fatalf("Search(%q) error = %v", query, err)
 		}
@@ -107,17 +107,17 @@ func TestIndexChunksReplacesPreviousVersion(t *testing.T) {
 func TestDeleteDocumentRemovesAllChunks(t *testing.T) {
 	ctx := context.Background()
 	index := openTestIndex(t)
-	if err := index.IndexChunks(ctx, "7", "version-a", testChunks("7", "version-a")); err != nil {
+	if err := index.IndexChunks(ctx, "7", "version-a", testChunks("7", "version-a"), document.DocumentMetadata{}); err != nil {
 		t.Fatalf("IndexChunks() error = %v", err)
 	}
-	if err := index.IndexChunks(ctx, "8", "version-a", testChunks("8", "version-a")); err != nil {
+	if err := index.IndexChunks(ctx, "8", "version-a", testChunks("8", "version-a"), document.DocumentMetadata{}); err != nil {
 		t.Fatalf("IndexChunks() error = %v", err)
 	}
 
 	if err := index.DeleteDocument(ctx, "7"); err != nil {
 		t.Fatalf("DeleteDocument() error = %v", err)
 	}
-	results, err := index.Search(ctx, "JWT tokens expire", 10)
+	results, err := index.Search(ctx, "JWT tokens expire", 10, document.MetadataFilter{})
 	if err != nil {
 		t.Fatalf("Search() error = %v", err)
 	}
@@ -131,17 +131,126 @@ func TestDeleteDocumentRemovesAllChunks(t *testing.T) {
 func TestSearchRejectsInvalidArguments(t *testing.T) {
 	ctx := context.Background()
 	index := openTestIndex(t)
-	if _, err := index.Search(ctx, "  ", 5); err == nil {
+	if _, err := index.Search(ctx, "  ", 5, document.MetadataFilter{}); err == nil {
 		t.Fatal("Search() with a blank query should fail")
 	}
-	if _, err := index.Search(ctx, "query", 0); err == nil {
+	if _, err := index.Search(ctx, "query", 0, document.MetadataFilter{}); err == nil {
 		t.Fatal("Search() with topK 0 should fail")
 	}
-	if err := index.IndexChunks(ctx, "7", "version-a", nil); err == nil {
+	if err := index.IndexChunks(ctx, "7", "version-a", nil, document.DocumentMetadata{}); err == nil {
 		t.Fatal("IndexChunks() with no chunks should fail")
 	}
 	mismatched := testChunks("9", "version-x")
-	if err := index.IndexChunks(ctx, "7", "version-a", mismatched); err == nil {
+	if err := index.IndexChunks(ctx, "7", "version-a", mismatched, document.DocumentMetadata{}); err == nil {
 		t.Fatal("IndexChunks() with mismatched ID/version should fail")
+	}
+}
+
+func TestSearchAppliesMetadataFilter(t *testing.T) {
+	ctx := context.Background()
+	index := openTestIndex(t)
+	defer index.Close()
+
+	ccnuboxMeta := document.DocumentMetadata{
+		Scalars: map[string]string{"category": "ccnubox", "module": "bff", "status": "done"},
+		Lists:   map[string][]string{"tags": {"ccnubox", "ccnubox/bff"}},
+	}
+	otherMeta := document.DocumentMetadata{
+		Scalars: map[string]string{"category": "notes", "module": "cli", "status": "draft"},
+		Lists:   map[string][]string{"tags": {"notes", "notes/cli"}},
+	}
+	if err := index.IndexChunks(ctx, "7", "v1", testChunks("7", "v1"), ccnuboxMeta); err != nil {
+		t.Fatalf("IndexChunks(ccnubox) error = %v", err)
+	}
+	if err := index.IndexChunks(ctx, "8", "v1", testChunks("8", "v1"), otherMeta); err != nil {
+		t.Fatalf("IndexChunks(other) error = %v", err)
+	}
+
+	// A scalar filter narrows to matching documents.
+	results, err := index.Search(ctx, "JWT tokens expire", 10, document.MetadataFilter{
+		Metadata: map[string]string{"category": "ccnubox"},
+	})
+	if err != nil {
+		t.Fatalf("Search(scalar filter) error = %v", err)
+	}
+	for _, result := range results {
+		if result.DocumentID != 7 {
+			t.Fatalf("Search(scalar filter) returned document %d, want only 7", result.DocumentID)
+		}
+	}
+
+	// Multiple scalar keys must all match.
+	results, err = index.Search(ctx, "JWT tokens expire", 10, document.MetadataFilter{
+		Metadata: map[string]string{"category": "ccnubox", "status": "draft"},
+	})
+	if err != nil {
+		t.Fatalf("Search(combined scalar filter) error = %v", err)
+	}
+	if len(results) != 0 {
+		t.Fatalf("Search(combined scalar filter) = %d results, want none", len(results))
+	}
+
+	// Tags use any-of overlap.
+	results, err = index.Search(ctx, "JWT tokens expire", 10, document.MetadataFilter{
+		Tags: []string{"notes/cli", "missing"},
+	})
+	if err != nil {
+		t.Fatalf("Search(tag any-of) error = %v", err)
+	}
+	for _, result := range results {
+		if result.DocumentID != 8 {
+			t.Fatalf("Search(tag any-of) returned document %d, want only 8", result.DocumentID)
+		}
+	}
+
+	// Scalar and tag constraints combine conjunctively.
+	results, err = index.Search(ctx, "JWT tokens expire", 10, document.MetadataFilter{
+		Metadata: map[string]string{"module": "bff"},
+		Tags:     []string{"ccnubox/bff"},
+	})
+	if err != nil {
+		t.Fatalf("Search(scalar and tags) error = %v", err)
+	}
+	if len(results) == 0 {
+		t.Fatal("Search(scalar and tags) returned no results")
+	}
+	for _, result := range results {
+		if result.DocumentID != 7 {
+			t.Fatalf("Search(scalar and tags) returned document %d, want only 7", result.DocumentID)
+		}
+	}
+
+	// Chunks indexed without filterable fields cannot match a filter.
+	if err := index.IndexChunks(ctx, "9", "v1", testChunks("9", "v1"), document.DocumentMetadata{}); err != nil {
+		t.Fatalf("IndexChunks(no metadata) error = %v", err)
+	}
+	results, err = index.Search(ctx, "JWT tokens expire", 10, document.MetadataFilter{
+		Metadata: map[string]string{"status": "done"},
+	})
+	if err != nil {
+		t.Fatalf("Search(after untagged insert) error = %v", err)
+	}
+	for _, result := range results {
+		if result.DocumentID == 9 {
+			t.Fatal("document without metadata terms matched a filter")
+		}
+	}
+
+	// An invalid filter is rejected before the index is queried.
+	if _, err := index.Search(ctx, "JWT tokens expire", 10, document.MetadataFilter{
+		Metadata: map[string]string{"status": " "},
+	}); err == nil {
+		t.Fatal("Search(invalid filter) error = nil")
+	}
+}
+
+func TestIndexChunksRejectsInvalidMetadata(t *testing.T) {
+	ctx := context.Background()
+	index := openTestIndex(t)
+	defer index.Close()
+
+	invalid := document.DocumentMetadata{Lists: map[string][]string{"tags": {" "}}}
+	if err := index.IndexChunks(ctx, "7", "v1", testChunks("7", "v1"), invalid); err == nil {
+		t.Fatal("IndexChunks(invalid metadata) error = nil")
 	}
 }

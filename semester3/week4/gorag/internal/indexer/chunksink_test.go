@@ -22,15 +22,16 @@ type sinkCall struct {
 	documentID string
 	version    string
 	chunkCount int
+	metadata   document.DocumentMetadata
 }
 
-func (s *fakeChunkSink) IndexChunks(ctx context.Context, documentID, version string, chunks []document.Chunk) error {
+func (s *fakeChunkSink) IndexChunks(ctx context.Context, documentID, version string, chunks []document.Chunk, metadata document.DocumentMetadata) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if len(s.indexCalls)+1 == s.failIndexCall {
 		return errors.New("sink index failed")
 	}
-	s.indexCalls = append(s.indexCalls, sinkCall{documentID: documentID, version: version, chunkCount: len(chunks)})
+	s.indexCalls = append(s.indexCalls, sinkCall{documentID: documentID, version: version, chunkCount: len(chunks), metadata: metadata})
 	return nil
 }
 

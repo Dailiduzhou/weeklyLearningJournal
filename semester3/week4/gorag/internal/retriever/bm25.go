@@ -10,12 +10,13 @@ import (
 	"github.com/cloudwego/eino/schema"
 
 	"gorag/internal/bm25"
+	"gorag/internal/document"
 )
 
 // BM25Searcher is implemented by bm25.Index. Its contract requires active
 // documents at their current version only, like the vector Searcher.
 type BM25Searcher interface {
-	Search(ctx context.Context, query string, topK int) ([]bm25.SearchResult, error)
+	Search(ctx context.Context, query string, topK int, filter document.MetadataFilter) ([]bm25.SearchResult, error)
 }
 
 // BM25Retriever adapts the local bluge lexical index to Eino's Retriever
@@ -63,8 +64,12 @@ func (r *BM25Retriever) Retrieve(ctx context.Context, query string, opts ...eino
 	if err := validateLimits(*options.TopK, *options.ScoreThreshold); err != nil {
 		return nil, err
 	}
+	filter, err := FilterFromOptions(opts...)
+	if err != nil {
+		return nil, err
+	}
 
-	results, err := r.searcher.Search(ctx, query, *options.TopK)
+	results, err := r.searcher.Search(ctx, query, *options.TopK, filter)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", ErrSearch, err)
 	}
