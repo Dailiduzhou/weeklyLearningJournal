@@ -425,12 +425,17 @@ func (i *Indexer) indexDocument(ctx context.Context, doc document.Document, forc
 		chunks[index].EmbeddingDimension = i.embedder.Dimension()
 		storedChunks[index] = repository.VersionChunk{Chunk: chunks[index], Embedding: vectors[index]}
 	}
+	parent, err := parentDocument(cleaned)
+	if err != nil {
+		return outcomeSkipped, 0, err
+	}
 	if err := i.store.InsertVersion(ctx, record.ID, version, storedChunks); err != nil {
 		return outcomeSkipped, 0, fmt.Errorf("insert version %q: %w", version, err)
 	}
 	if err := i.store.ActivateVersion(ctx, repository.Activation{
 		DocumentID: record.ID, Version: version, ExpectedChunkCount: len(storedChunks),
 		Title: doc.Title, ContentHash: doc.ContentHash,
+		Parent: parent,
 	}); err != nil {
 		return outcomeSkipped, 0, fmt.Errorf("activate version %q: %w", version, err)
 	}
@@ -462,6 +467,23 @@ func (i *Indexer) nextVersion() (string, error) {
 	i.versionMu.Lock()
 	defer i.versionMu.Unlock()
 	return i.version()
+}
+
+// parentDocument builds the whole-document parent stored with an activation.
+// Parent text is the cleaned content the chunks were split from, and its line
+// range cites the cleaned content's position in the original source file.
+func parentDocument(cleaned cleaner.Result) (repository.ActivationParent, error) {
+	if strings.TrimSpace(cleaned.Content) == "" {
+		return repository.ActivationParent{}, errors.New("indexer: cleaned document is empty")
+	}
+	if len(cleaned.LineNumbers) == 0 {
+		return repository.ActivationParent{}, errors.New("indexer: cleaned document has no line mapping")
+	}
+	return repository.ActivationParent{
+		Content:   cleaned.Content,
+		StartLine: cleaned.LineNumbers[0],
+		EndLine:   cleaned.LineNumbers[len(cleaned.LineNumbers)-1],
+	}, nil
 }
 
 func (i *Indexer) withRun(ctx context.Context, runType string, work func(context.Context, *Result) error) (Result, error) {

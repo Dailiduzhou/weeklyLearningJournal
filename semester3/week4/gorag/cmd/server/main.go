@@ -72,6 +72,13 @@ func runApplication(ctx context.Context, logger *slog.Logger) error {
 		return fmt.Errorf("construct retriever: %w", err)
 	}
 	defer closeBM25()
+	if cfg.Retrieval.Parent.Enabled {
+		parentRetriever, err := retriever.NewParentDocumentRetriever(startupCtx, onlineRetriever, repositoryStore)
+		if err != nil {
+			return fmt.Errorf("construct parent document retriever: %w", err)
+		}
+		onlineRetriever = parentRetriever
+	}
 	contextBuilder, err := rag.NewContextBuilder(cfg.Retrieval.MaxContext)
 	if err != nil {
 		return fmt.Errorf("construct context builder: %w", err)

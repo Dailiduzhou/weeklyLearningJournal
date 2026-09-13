@@ -53,6 +53,31 @@ type Activation struct {
 	ExpectedChunkCount int
 	Title              string
 	ContentHash        string
+	// Parent is the whole-document text stored with the activation so parent
+	// retrieval can expand child chunks back to the exact version being
+	// activated. It is required: every active version owns parent content.
+	Parent ActivationParent
+}
+
+// ActivationParent carries the cleaned document text and its position in the
+// original source file, so parent-level citations stay source-accurate.
+type ActivationParent struct {
+	Content   string
+	StartLine int
+	EndLine   int
+}
+
+// ParentDocument is the stored parent text of a document's current active
+// version. StartLine and EndLine cite the cleaned content's position in the
+// original source file.
+type ParentDocument struct {
+	DocumentID int64
+	SourcePath string
+	Title      string
+	Version    string
+	Content    string
+	StartLine  int
+	EndLine    int
 }
 
 type SearchResult struct {

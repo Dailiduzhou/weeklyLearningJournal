@@ -72,6 +72,7 @@ type RetrievalConfig struct {
 	SimilarityThreshold float64      `mapstructure:"similarity_threshold"`
 	Vector              VectorConfig `mapstructure:"vector"`
 	BM25                BM25Config   `mapstructure:"bm25"`
+	Parent              ParentConfig `mapstructure:"parent"`
 }
 
 // VectorConfig toggles the pgvector cosine retriever.
@@ -86,6 +87,15 @@ type BM25Config struct {
 	Enabled   bool    `mapstructure:"enabled"`
 	IndexPath string  `mapstructure:"index_path"`
 	MinScore  float64 `mapstructure:"min_score"`
+}
+
+// ParentConfig toggles parent document retrieval: the same child-chunk
+// search runs, but each hit is expanded to its whole parent document before
+// context selection. The indexer always stores parent content, so flipping
+// this toggle needs no schema change, only parent rows for documents indexed
+// before this feature (rebuild them with `indexer reindex-all`).
+type ParentConfig struct {
+	Enabled bool `mapstructure:"enabled"`
 }
 
 type AnswerConfig struct {
@@ -300,6 +310,7 @@ var configurationKeys = []string{
 	"retrieval.bm25.enabled",
 	"retrieval.bm25.index_path",
 	"retrieval.bm25.min_score",
+	"retrieval.parent.enabled",
 	"answer.provider",
 	"answer.base_url",
 	"answer.model",
@@ -328,6 +339,7 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("retrieval.bm25.enabled", false)
 	v.SetDefault("retrieval.bm25.index_path", "./data/bm25")
 	v.SetDefault("retrieval.bm25.min_score", 0.0)
+	v.SetDefault("retrieval.parent.enabled", false)
 	v.SetDefault("answer.provider", "ollama")
 	v.SetDefault("answer.base_url", "http://localhost:11434")
 	v.SetDefault("answer.model", "qwen3:4b")

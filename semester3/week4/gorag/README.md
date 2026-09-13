@@ -80,6 +80,7 @@ Embedding 模型固定为 `qwen3-embedding:0.6b`，不通过配置覆盖；`embe
 | `GORAG_RETRIEVAL_BM25_ENABLED` | `false` | 是否启用 bluge BM25 词法检索 |
 | `GORAG_RETRIEVAL_BM25_INDEX_PATH` | `./data/bm25` | BM25 索引目录；启用 BM25 时必填 |
 | `GORAG_RETRIEVAL_BM25_MIN_SCORE` | `0` | BM25 最低得分（原始 BM25 分，非余弦相似度） |
+| `GORAG_RETRIEVAL_PARENT_ENABLED` | `false` | 是否启用父文档检索（Parent Document Retrieval） |
 | `GORAG_ANSWER_PROVIDER` | `ollama` | `ollama` 或 `openai-compatible` |
 | `GORAG_ANSWER_BASE_URL` | `http://localhost:11434` | 回答模型 API 地址 |
 | `GORAG_ANSWER_MODEL` | `qwen3:4b` | 回答模型名称 |
@@ -100,6 +101,20 @@ Embedding 模型固定为 `qwen3-embedding:0.6b`，不通过配置覆盖；`embe
 - 两者都关：配置校验失败，服务拒绝启动。
 
 启用 BM25 后，`indexer` 会在每次激活文档版本时把 Chunk 镜像写入 `retrieval.bm25.index_path` 指向的目录，删除文档时同步清理，因此 BM25 索引始终与数据库当前版本一致。若先开启 BM25，需要重新执行一次 `indexer reindex-all` 来补建词法索引。
+
+### 父文档检索（Parent Document Retrieval）
+
+`retrieval.parent.enabled: true`（或 `GORAG_RETRIEVAL_PARENT_ENABLED=true`）启用父文档检索，基于 eino 的 `flow/retriever/parent` 组件：
+
+- 索引侧在每次激活版本时，把整篇清洗后的文档文本随同一事务写入 `document_parents` 表，因此父文档内容永远与当前激活版本一致；删除文档时同样不可见。
+- 检索侧仍用小块 Chunk 做向量/BM25/RRF 匹配，再把命中的 Chunk 按其 `document_id` 元数据还原成所属的整篇父文档，参与后续上下文选择。
+
+小块保证精确的嵌入匹配，父文档给模型完整的段落级上下文，缓解答案恰好被切在 Chunk 边界的问题。同一篇文档命中多个 Chunk 时只返回一个父文档：父文档顺序与子 Chunk 排名一致，相似度取该文档最高子 Chunk 得分；引用行号是清洗后内容在原始文件中的位置（去除 front matter 后不再从第 1 行开始）。
+
+两点运维注意：
+
+1. 该开关只影响查询侧，且父文档模式下 `retrieval.max_context` 限制的是父文档（整篇文档）数量，提示词占用会明显增大，建议按文档平均长度适当调低。
+2. 对启用前已索引的文档，需要执行一次 `indexer reindex-all` 补写父文档内容；未补写的文档在父文档模式下会被跳过，若所有命中文档都没有父内容则返回拒答。
 
 ## 端到端评测
 

@@ -106,3 +106,47 @@ func validTestConfig() Config {
 		Startup:   StartupConfig{CheckTimeout: time.Second, RetryInterval: time.Second},
 	}
 }
+
+func TestLoadDefaultsDisableParentRetrieval(t *testing.T) {
+	path := writeConfig(t, "database:\n  url: \"postgres://u:p@db.example:5432/gorag\"\n")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Retrieval.Parent.Enabled {
+		t.Fatal("Retrieval.Parent.Enabled should default to false")
+	}
+}
+
+func TestLoadReadsParentToggleFromFileAndEnvironment(t *testing.T) {
+	path := writeConfig(t, "retrieval:\n  parent:\n    enabled: true\n")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if !cfg.Retrieval.Parent.Enabled {
+		t.Fatal("Retrieval.Parent.Enabled from file was not read")
+	}
+
+	t.Setenv("GORAG_RETRIEVAL_PARENT_ENABLED", "false")
+	cfg, err = Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Retrieval.Parent.Enabled {
+		t.Fatal("GORAG_RETRIEVAL_PARENT_ENABLED=false should override the file")
+	}
+}
+
+func TestValidateAcceptsParentRetrievalWithEitherRetriever(t *testing.T) {
+	cfg := validTestConfig()
+	cfg.Retrieval.Parent.Enabled = true
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() error = %v, want nil", err)
+	}
+	cfg.Retrieval.Vector.Enabled = false
+	cfg.Retrieval.BM25.Enabled = true
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("Validate() with BM25-only parent retrieval error = %v, want nil", err)
+	}
+}

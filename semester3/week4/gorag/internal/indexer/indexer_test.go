@@ -46,6 +46,47 @@ func TestSyncIsRepeatableAndReindexesChangedDocument(t *testing.T) {
 	}
 }
 
+func TestSyncStoresParentDocumentWithActivation(t *testing.T) {
+	ctx := context.Background()
+	loader := &fakeLoader{documents: []document.Document{{
+		SourcePath: "guide.md", Title: "guide.md", Kind: document.KindMarkdown,
+		Content: "---\ntitle: Guide\n---\n\n# Guide\n\nBody", ContentHash: "hash-v1",
+	}}}
+	store := newMemoryStore()
+	indexer := newTestIndexer(t, loader, store, nil)
+
+	if _, err := indexer.Sync(ctx); err != nil {
+		t.Fatalf("Sync() error = %v", err)
+	}
+	if len(store.activations) != 1 {
+		t.Fatalf("activations recorded = %d, want 1", len(store.activations))
+	}
+	parent := store.activations[0].Parent
+	if parent.Content != "# Guide\n\nBody" {
+		t.Fatalf("parent content = %q, want the cleaned document text", parent.Content)
+	}
+	// Front matter occupies lines 1-3 and the leading blank line 4 of the
+	// source file, so the parent must cite the cleaned content's real
+	// position instead of assuming the file starts at line 1.
+	if parent.StartLine != 5 || parent.EndLine != 7 {
+		t.Fatalf("parent line range = %d..%d, want 5..7", parent.StartLine, parent.EndLine)
+	}
+
+	// Reindexing the document replaces the parent text with the new version.
+	loader.documents[0].Content = "# Guide\n\nRewritten body"
+	loader.documents[0].ContentHash = "hash-v2"
+	if _, err := indexer.Sync(ctx); err != nil {
+		t.Fatalf("second Sync() error = %v", err)
+	}
+	if len(store.activations) != 2 {
+		t.Fatalf("activations recorded = %d, want 2", len(store.activations))
+	}
+	updated := store.activations[1].Parent
+	if updated.Content != "# Guide\n\nRewritten body" || updated.StartLine != 1 || updated.EndLine != 3 {
+		t.Fatalf("updated parent = %#v, want rewritten text at lines 1..3", updated)
+	}
+}
+
 func TestReindexFailurePreservesActiveVersion(t *testing.T) {
 	ctx := context.Background()
 	loader := &fakeLoader{documents: []document.Document{testDocument("guide.md", "hash-v1")}}
@@ -426,6 +467,7 @@ type memoryStore struct {
 	byPath               map[string]repository.Document
 	chunks               map[int64]map[string][]repository.VersionChunk
 	runs                 []repository.IndexRun
+	activations          []repository.Activation
 	nextID               int64
 	insertCalls          int
 	insertErr            error
@@ -510,6 +552,7 @@ func (s *memoryStore) ActivateVersion(ctx context.Context, activation repository
 	if len(s.chunks[activation.DocumentID][activation.Version]) != activation.ExpectedChunkCount {
 		return repository.ErrIncompleteVersion
 	}
+	s.activations = append(s.activations, activation)
 	for path, record := range s.byPath {
 		if record.ID == activation.DocumentID {
 			version := activation.Version

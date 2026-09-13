@@ -34,6 +34,8 @@ retrieval:
     enabled: false
     index_path: "./data/bm25"
     min_score: 0
+  parent:
+    enabled: false
 
 answer:
   provider: "ollama"

@@ -210,16 +210,12 @@ func (r *Repository) InsertVersion(ctx context.Context, documentID int64, versio
 
 // ActivateVersion uses a short transaction and checks that indices are the
 // exact continuous range [0, ExpectedChunkCount). Database constraints already
-// guarantee the fixed model and vector dimension.
+// guarantee the fixed model and vector dimension. The whole-document parent
+// text is stored in the same transaction, so retrieval can never observe a
+// parent that belongs to a version other than the active one.
 func (r *Repository) ActivateVersion(ctx context.Context, activation Activation) (err error) {
-	if activation.DocumentID <= 0 || strings.TrimSpace(activation.Version) == "" {
-		return errors.New("repository: activation requires document ID and version")
-	}
-	if activation.ExpectedChunkCount <= 0 {
-		return errors.New("repository: expected chunk count must be positive")
-	}
-	if strings.TrimSpace(activation.Title) == "" || strings.TrimSpace(activation.ContentHash) == "" {
-		return errors.New("repository: activation requires title and content hash")
+	if err := validateActivation(activation); err != nil {
+		return err
 	}
 
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
@@ -261,6 +257,19 @@ func (r *Repository) ActivateVersion(ctx context.Context, activation Activation)
 	if command.RowsAffected() != 1 {
 		return fmt.Errorf("repository: activate document %d: %w", activation.DocumentID, pgx.ErrNoRows)
 	}
+	if _, err = tx.Exec(ctx, `
+		INSERT INTO document_parents (document_id, document_version, content, start_line, end_line)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (document_id) DO UPDATE SET
+		    document_version = EXCLUDED.document_version,
+		    content = EXCLUDED.content,
+		    start_line = EXCLUDED.start_line,
+		    end_line = EXCLUDED.end_line,
+		    created_at = now()`,
+		activation.DocumentID, activation.Version, activation.Parent.Content,
+		activation.Parent.StartLine, activation.Parent.EndLine); err != nil {
+		return fmt.Errorf("repository: store parent for document %d version %q: %w", activation.DocumentID, activation.Version, err)
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return fmt.Errorf("repository: commit activation for document %d: %w", activation.DocumentID, err)
 	}
@@ -299,6 +308,8 @@ func (r *Repository) DeleteInactiveVersions(ctx context.Context, documentID int6
 	return command.RowsAffected(), nil
 }
 
+// Search returns the limit most cosine-similar chunks of active documents at
+// their current version.
 func (r *Repository) Search(ctx context.Context, queryVector []float32, limit int) ([]SearchResult, error) {
 	if len(queryVector) != embedding.VectorDimension {
 		return nil, fmt.Errorf("repository: query vector dimension %d, want %d", len(queryVector), embedding.VectorDimension)
@@ -344,6 +355,81 @@ func (r *Repository) Search(ctx context.Context, queryVector []float32, limit in
 	return results, nil
 }
 
+// MaxParentBatchSize bounds one parent-document fetch. It matches the
+// largest retriever TopK, since parent IDs are deduplicated child results.
+const MaxParentBatchSize = 100
+
+// GetParentDocuments returns the current parent document for each requested
+// ID, in request order. IDs whose parent is missing, stale, deleted, or not
+// active are skipped, so parent retrieval can never serve text that does not
+// belong to the currently active version.
+func (r *Repository) GetParentDocuments(ctx context.Context, ids []int64) ([]ParentDocument, error) {
+	canonical, err := canonicalParentIDs(ids)
+	if err != nil {
+		return nil, err
+	}
+	if len(canonical) == 0 {
+		return []ParentDocument{}, nil
+	}
+	rows, err := r.pool.Query(ctx, `
+		SELECT parents.document_id, documents.source_path, documents.title,
+		       parents.document_version, parents.content,
+		       parents.start_line, parents.end_line
+		FROM document_parents parents
+		JOIN documents ON documents.id = parents.document_id
+		              AND documents.current_version = parents.document_version
+		              AND documents.status = 'active'
+		WHERE parents.document_id = ANY($1)`, canonical)
+	if err != nil {
+		return nil, fmt.Errorf("repository: fetch parent documents: %w", err)
+	}
+	defer rows.Close()
+
+	byID := make(map[int64]ParentDocument, len(canonical))
+	for rows.Next() {
+		var parent ParentDocument
+		if err := rows.Scan(&parent.DocumentID, &parent.SourcePath, &parent.Title,
+			&parent.Version, &parent.Content, &parent.StartLine, &parent.EndLine); err != nil {
+			return nil, fmt.Errorf("repository: scan parent document: %w", err)
+		}
+		byID[parent.DocumentID] = parent
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("repository: iterate parent documents: %w", err)
+	}
+
+	// Emit in request order so the child-rank ordering the retriever asked for
+	// survives the store round trip.
+	parents := make([]ParentDocument, 0, len(canonical))
+	for _, id := range canonical {
+		if parent, exists := byID[id]; exists {
+			parents = append(parents, parent)
+		}
+	}
+	return parents, nil
+}
+
+// canonicalParentIDs validates and deduplicates requested parent IDs while
+// preserving first-seen order, which carries the child-rank ordering.
+func canonicalParentIDs(ids []int64) ([]int64, error) {
+	if len(ids) > MaxParentBatchSize {
+		return nil, fmt.Errorf("repository: parent batch %d exceeds limit %d", len(ids), MaxParentBatchSize)
+	}
+	seen := make(map[int64]struct{}, len(ids))
+	canonical := make([]int64, 0, len(ids))
+	for _, id := range ids {
+		if id <= 0 {
+			return nil, fmt.Errorf("repository: parent document ID %d must be positive", id)
+		}
+		if _, duplicate := seen[id]; duplicate {
+			continue
+		}
+		seen[id] = struct{}{}
+		canonical = append(canonical, id)
+	}
+	return canonical, nil
+}
+
 type rowScanner interface {
 	Scan(...any) error
 }
@@ -374,6 +460,26 @@ func validateDocumentCreate(input DocumentCreate) error {
 func validateSourcePath(sourcePath string) error {
 	if sourcePath == "" || strings.Contains(sourcePath, "\\") || path.IsAbs(sourcePath) || path.Clean(sourcePath) != sourcePath || sourcePath == "." || strings.HasPrefix(sourcePath, "../") {
 		return fmt.Errorf("repository: source path %q must be a normalized relative slash path", sourcePath)
+	}
+	return nil
+}
+
+func validateActivation(activation Activation) error {
+	if activation.DocumentID <= 0 || strings.TrimSpace(activation.Version) == "" {
+		return errors.New("repository: activation requires document ID and version")
+	}
+	if activation.ExpectedChunkCount <= 0 {
+		return errors.New("repository: expected chunk count must be positive")
+	}
+	if strings.TrimSpace(activation.Title) == "" || strings.TrimSpace(activation.ContentHash) == "" {
+		return errors.New("repository: activation requires title and content hash")
+	}
+	if strings.TrimSpace(activation.Parent.Content) == "" {
+		return errors.New("repository: activation requires parent document content")
+	}
+	if activation.Parent.StartLine <= 0 || activation.Parent.EndLine < activation.Parent.StartLine {
+		return fmt.Errorf("repository: activation parent line range %d..%d is invalid",
+			activation.Parent.StartLine, activation.Parent.EndLine)
 	}
 	return nil
 }
