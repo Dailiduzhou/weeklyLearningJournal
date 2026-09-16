@@ -34,9 +34,9 @@ type ParentStore interface {
 // NewParentDocumentRetriever wraps a child-chunk retriever with Eino's parent
 // flow retriever. Child hits are mapped to their parent document by the
 // document_id metadata key, deduplicated in child-rank order, and expanded to
-// whole documents fetched from the parent store. Each returned parent carries
-// the best child score of the request, so context selection keeps ranking by
-// retrieval relevance.
+// whole documents fetched from the parent store. Each parent retains the best
+// retrieval score and, when reranked, the lowest child rerank position. These
+// are separate contracts: an ordinal must never replace the public score.
 func NewParentDocumentRetriever(ctx context.Context, child einoretriever.Retriever, store ParentStore) (einoretriever.Retriever, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -63,16 +63,27 @@ func NewParentDocumentRetriever(ctx context.Context, child einoretriever.Retriev
 // into the parent documents it fetches, so this collector lets the getter
 // restore each parent's best-child relevance score request-locally.
 type parentScoreCollector struct {
-	mu   sync.Mutex
-	best map[string]float64
+	mu        sync.Mutex
+	best      map[string]float64
+	positions map[string]int
 }
 
-func (c *parentScoreCollector) record(parentID string, score float64) {
+func (c *parentScoreCollector) record(parentID string, score float64, position int, reranked bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if current, exists := c.best[parentID]; !exists || score > current {
 		c.best[parentID] = score
 	}
+	if current, exists := c.positions[parentID]; reranked && (!exists || position < current) {
+		c.positions[parentID] = position
+	}
+}
+
+func (c *parentScoreCollector) position(parentID string) (int, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	position, exists := c.positions[parentID]
+	return position, exists
 }
 
 func (c *parentScoreCollector) score(parentID string) float64 {
@@ -97,7 +108,7 @@ func (r parentDocumentRetriever) Retrieve(ctx context.Context, query string, opt
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-	ctx = context.WithValue(ctx, parentScoreCollectorKey{}, &parentScoreCollector{best: make(map[string]float64)})
+	ctx = context.WithValue(ctx, parentScoreCollectorKey{}, &parentScoreCollector{best: make(map[string]float64), positions: make(map[string]int)})
 	return r.inner.Retrieve(ctx, query, opts...)
 }
 
@@ -114,8 +125,12 @@ func (r *scoreRecordingRetriever) Retrieve(ctx context.Context, query string, op
 	}
 	if collector, ok := ctx.Value(parentScoreCollectorKey{}).(*parentScoreCollector); ok {
 		for _, document := range documents {
+			if document == nil {
+				return nil, fmt.Errorf("%w: nil child document", ErrParentFetch)
+			}
 			if documentID, exists := document.MetaData[MetadataDocumentID].(string); exists && documentID != "" {
-				collector.record(documentID, document.Score())
+				position, reranked := RerankPosition(document)
+				collector.record(documentID, document.Score(), position, reranked)
 			}
 		}
 	}
@@ -153,7 +168,13 @@ func (g *parentDocumentGetter) get(ctx context.Context, ids []string) ([]*schema
 		if collector != nil {
 			score = collector.score(strconv.FormatInt(parent.DocumentID, 10))
 		}
-		documents = append(documents, parentToEinoDocument(parent, score))
+		document := parentToEinoDocument(parent, score)
+		if collector != nil {
+			if position, exists := collector.position(strconv.FormatInt(parent.DocumentID, 10)); exists {
+				document.MetaData[MetadataRerankPosition] = position
+			}
+		}
+		documents = append(documents, document)
 	}
 	return documents, nil
 }

@@ -73,6 +73,10 @@ func runApplication(ctx context.Context, logger *slog.Logger) error {
 		return fmt.Errorf("construct retriever: %w", err)
 	}
 	defer closeBM25()
+	onlineRetriever, err = buildRerankRetriever(cfg.Rerank, onlineRetriever, logger)
+	if err != nil {
+		return err
+	}
 	if cfg.Retrieval.Parent.Enabled {
 		parentRetriever, err := retriever.NewParentDocumentRetriever(startupCtx, onlineRetriever, repositoryStore)
 		if err != nil {

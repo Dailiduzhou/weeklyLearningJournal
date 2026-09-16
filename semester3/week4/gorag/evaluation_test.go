@@ -71,7 +71,8 @@ func TestLiveEvaluation(t *testing.T) {
 		os.Getenv("GORAG_EVALUATION_INCLUDE_SCENARIOS"),
 		os.Getenv("GORAG_EVALUATION_EXCLUDE_SCENARIOS"),
 	)
-	client, err := evaluation.NewHTTPClient(endpoint, &http.Client{Timeout: 30 * time.Second})
+	// Allow the default 30s rerank plus 60s answer budget and retrieval overhead.
+	client, err := evaluation.NewHTTPClient(endpoint, &http.Client{Timeout: 2 * time.Minute})
 	if err != nil {
 		t.Fatalf("create HTTP evaluation client: %v", err)
 	}
@@ -80,7 +81,7 @@ func TestLiveEvaluation(t *testing.T) {
 		t.Fatalf("create evaluation runner: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 	defer cancel()
 	report, err := runner.Run(ctx, cases)
 	if err != nil {

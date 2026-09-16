@@ -32,6 +32,7 @@ type Config struct {
 	Documents DocumentsConfig `mapstructure:"documents"`
 	Retrieval RetrievalConfig `mapstructure:"retrieval"`
 	Answer    AnswerConfig    `mapstructure:"answer"`
+	Rerank    RerankConfig    `mapstructure:"rerank"`
 	Startup   StartupConfig   `mapstructure:"startup"`
 }
 
@@ -106,6 +107,19 @@ type AnswerConfig struct {
 	Timeout  time.Duration `mapstructure:"timeout"`
 }
 
+// RerankConfig is independent of AnswerConfig. Disabled reranking neither
+// validates connection settings nor constructs/probes a model client.
+type RerankConfig struct {
+	Enabled        bool          `mapstructure:"enabled"`
+	Provider       string        `mapstructure:"provider"`
+	BaseURL        string        `mapstructure:"base_url"`
+	Model          string        `mapstructure:"model"`
+	APIKey         string        `mapstructure:"api_key"`
+	Timeout        time.Duration `mapstructure:"timeout"`
+	MaxInputChars  int           `mapstructure:"max_input_chars"`
+	MaxConcurrency int           `mapstructure:"max_concurrency"`
+}
+
 type StartupConfig struct {
 	CheckTimeout  time.Duration `mapstructure:"check_timeout"`
 	RetryInterval time.Duration `mapstructure:"retry_interval"`
@@ -129,6 +143,15 @@ func (c Config) LogValue() slog.Value {
 			slog.String("model", c.Answer.Model),
 			slog.Duration("timeout", c.Answer.Timeout),
 			slog.Bool("api_key_configured", c.Answer.APIKey != ""),
+		),
+		slog.Group("rerank",
+			slog.Bool("enabled", c.Rerank.Enabled),
+			slog.String("provider", c.Rerank.Provider),
+			slog.String("model", c.Rerank.Model),
+			slog.Duration("timeout", c.Rerank.Timeout),
+			slog.Int("max_input_chars", c.Rerank.MaxInputChars),
+			slog.Int("max_concurrency", c.Rerank.MaxConcurrency),
+			slog.Bool("api_key_configured", c.Rerank.APIKey != ""),
 		),
 		slog.Any("startup", c.Startup),
 	)
@@ -234,6 +257,20 @@ func (c Config) Validate() error {
 		problems = append(problems, errors.New("answer.model must not be empty"))
 	}
 	positiveDuration(&problems, "answer.timeout", c.Answer.Timeout)
+	if c.Rerank.Enabled {
+		if c.Rerank.Provider != "ollama" && c.Rerank.Provider != "openai-compatible" {
+			problems = append(problems, errors.New("rerank.provider must be ollama or openai-compatible"))
+		}
+		if err := validateURL("rerank.base_url", c.Rerank.BaseURL, "http", "https"); err != nil {
+			problems = append(problems, err)
+		}
+		if strings.TrimSpace(c.Rerank.Model) == "" {
+			problems = append(problems, errors.New("rerank.model must not be empty"))
+		}
+		positiveDuration(&problems, "rerank.timeout", c.Rerank.Timeout)
+		positiveInt(&problems, "rerank.max_input_chars", c.Rerank.MaxInputChars)
+		positiveInt(&problems, "rerank.max_concurrency", c.Rerank.MaxConcurrency)
+	}
 	positiveDuration(&problems, "startup.check_timeout", c.Startup.CheckTimeout)
 	positiveDuration(&problems, "startup.retry_interval", c.Startup.RetryInterval)
 	if c.Startup.RetryInterval > c.Startup.CheckTimeout {
@@ -316,6 +353,14 @@ var configurationKeys = []string{
 	"answer.model",
 	"answer.api_key",
 	"answer.timeout",
+	"rerank.enabled",
+	"rerank.provider",
+	"rerank.base_url",
+	"rerank.model",
+	"rerank.api_key",
+	"rerank.timeout",
+	"rerank.max_input_chars",
+	"rerank.max_concurrency",
 	"startup.check_timeout",
 	"startup.retry_interval",
 }
@@ -345,6 +390,14 @@ func setDefaults(v *viper.Viper) {
 	v.SetDefault("answer.model", "qwen3:4b")
 	v.SetDefault("answer.api_key", "")
 	v.SetDefault("answer.timeout", "60s")
+	v.SetDefault("rerank.enabled", false)
+	v.SetDefault("rerank.provider", "openai-compatible")
+	v.SetDefault("rerank.base_url", "")
+	v.SetDefault("rerank.model", "")
+	v.SetDefault("rerank.api_key", "")
+	v.SetDefault("rerank.timeout", "30s")
+	v.SetDefault("rerank.max_input_chars", 24000)
+	v.SetDefault("rerank.max_concurrency", 1)
 	v.SetDefault("startup.check_timeout", "30s")
 	v.SetDefault("startup.retry_interval", "1s")
 }

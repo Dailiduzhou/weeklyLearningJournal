@@ -94,6 +94,14 @@ Embedding 模型固定为 `qwen3-embedding:0.6b`，不通过配置覆盖；`embe
 | `GORAG_ANSWER_MODEL` | `qwen3:4b` | 回答模型名称 |
 | `GORAG_ANSWER_API_KEY` | 空 | 远程模型密钥；只能通过秘密环境注入，禁止记录 |
 | `GORAG_ANSWER_TIMEOUT` | `60s` | 回答调用超时 |
+| `GORAG_RERANK_ENABLED` | `false` | 是否启用可选 LLM 重排；只影响查询侧 |
+| `GORAG_RERANK_PROVIDER` | `openai-compatible` | `openai-compatible` 或 `ollama`，不继承回答配置 |
+| `GORAG_RERANK_BASE_URL` | 空 | 独立聊天 API 地址；启用时必填 |
+| `GORAG_RERANK_MODEL` | 空 | 独立重排模型名；启用时必填 |
+| `GORAG_RERANK_API_KEY` | 空 | 重排服务密钥；通过秘密环境注入 |
+| `GORAG_RERANK_TIMEOUT` | `30s` | 单次重排超时；不重试 |
+| `GORAG_RERANK_MAX_INPUT_CHARS` | `24000` | 完整提示词内容的 Unicode 字符预算 |
+| `GORAG_RERANK_MAX_CONCURRENCY` | `1` | 单个 server 进程的重排并发上限；满额不排队 |
 | `GORAG_STARTUP_CHECK_TIMEOUT` | `30s` | 启动依赖检查总时限 |
 | `GORAG_STARTUP_RETRY_INTERVAL` | `1s` | 启动检查重试间隔 |
 
@@ -123,6 +131,28 @@ Embedding 模型固定为 `qwen3-embedding:0.6b`，不通过配置覆盖；`embe
 
 1. 该开关只影响查询侧，且父文档模式下 `retrieval.max_context` 限制的是父文档（整篇文档）数量，提示词占用会明显增大，建议按文档平均长度适当调低。
 2. 对启用前已索引的文档，需要执行一次 `indexer reindex-all` 补写父文档内容；未补写的文档在父文档模式下会被跳过，若所有命中文档都没有父内容则返回拒答。
+
+### 可选 LLM 重排（Rerank）
+
+默认关闭。填好独立的 `rerank.base_url`、`rerank.model` 并通过环境变量注入所需密钥后，设置 `GORAG_RERANK_ENABLED=true`。默认使用 OpenAI-compatible **聊天接口**（`/chat/completions`，不是专用 `/rerank` 接口）；也可选择 Ollama 聊天接口。连接地址、模型、密钥和超时均不继承 `answer`。仅开启 rerank 不需要重建索引、迁移数据库或下载额外 Ollama 模型。
+
+执行顺序：
+
+```text
+元数据过滤后的向量/BM25 召回 → 可选 RRF 融合
+→ 可选 Chunk LLM 重排 → 可选父文档展开与去重
+→ max_context 最终选取 → 回答及引用校验
+```
+
+- 一次 listwise 调用，输入问题和全部候选的临时 ID、标题、章节路径、完整 Chunk 正文。候选及问题按 JSON 数据传递，并在系统提示词中明确不得执行其中的指令。启用远程服务意味着这些内容将发送到你配置的服务，请先确认其数据处理政策。
+- 只排序、不打分、不删候选。严格接受 `{"ranking":["C3","C1","C2"]}` 形式的完整排列；候选 ID 必须全覆盖且不重复。不容忍解释文字、Markdown 围栏、额外/重复 JSON 字段、未知 ID 或缺失 ID，不修复输出。
+- 重排位置是请求内独立的序号，**不会覆盖检索分数**。父文档取最佳（最靠前）子块的重排位置，保留最高子块检索分数；所有候选先展开去重，然后才截取 `max_context`，避免同一父文档的多个块占满名额。最终上下文不会再按旧分数覆盖重排顺序。
+- API 响应和引用结构不变，`similarity` 仍是原检索分数（向量相似度、BM25 分或 RRF 分，取决于检索方式），不是 LLM 置信度或排序位置。重排只改变顺序；过滤、拒答和引用校验继续沿用原机制。
+- 少于两个候选时不调用。预算按两条消息的完整 `content` 计算，包括指令、问题、JSON 字段/转义、ID、标题、章节和正文。超过 `max_input_chars` 就整批跳过，不截短、不分组、不只排前几条。字符预算不是精确 token 上限，也不包含 provider 的聊天模板开销，需按所选模型窗口调整。
+- 并发限制为单进程级，仅限制重排调用，不限制回答调用；多副本部署需另行规划总容量。满额立即跳过，不排队。模型超时、网络/HTTP 错误或格式不合格均完整回退原检索结果，不重试。用户取消或整个请求到期则终止，不能继续调用回答模型。
+- 启用时非法 provider/URL、空模型、非正超时/预算/并发会在启动时报错；关闭时跳过这些重排语义校验且不构造客户端。YAML 仍严格校验字段名与类型。**重排服务不是启动或 `/readyz` 的硬依赖**，运行时不可用只影响本次增强步骤。
+
+开启后的每次检索完成会记录 `rerank completed` 结构化日志，包含 `status`、`reason`、`duration`、`candidate_count`、`input_chars`。常见原因：`ranked`、`insufficient_candidates`、`input_budget_exceeded`、`concurrency_limited`、`timeout`、`model_error`、`invalid_response`；请求取消记录 `request_canceled`。日志不包含问题、候选正文、模型原始输出、原始 provider 错误或密钥；关闭状态由启动配置日志确认。持续降级时检查连接、认证、模型输出格式、耗时和窗口大小，不要仅凭接口返回成功认定重排生效。
 
 ### 元数据过滤（Metadata Filtering）
 
@@ -160,10 +190,36 @@ tags:
 `testdata/evaluation.jsonl` 包含知识库内、同义改写、跨章节、知识库外、模糊、删除和重建场景。服务启动并准备好对应索引状态后，可运行：
 
 ```shell
-GORAG_EVALUATION_ENDPOINT=http://localhost:8080/api/v1/questions go test -run TestLiveEvaluation -v .
+GORAG_EVALUATION_ENDPOINT=http://localhost:8080/api/v1/questions go test -timeout 35m -run TestLiveEvaluation -v .
 ```
 
 删除场景与正常场景的数据库状态互斥，可分阶段执行。正常状态排除删除场景时设置 `GORAG_EVALUATION_EXCLUDE_SCENARIOS=deleted_document`；执行 `indexer delete` 后仅验证删除场景时设置 `GORAG_EVALUATION_INCLUDE_SCENARIOS=deleted_document`，完成后使用 `indexer reindex` 恢复文档。
+
+### 重排开关对照评测
+
+先填好 `.env` 中的独立重排连接信息。固定同一份资料及索引版本、检索配置、回答模型和问题集，串行对比关闭/开启；不在两轮之间修改资料或重建索引。以下命令排除需要单独准备删除状态的场景：
+
+```shell
+# 基线：关闭重排，构建并启动服务。
+GORAG_RERANK_ENABLED=false docker compose up -d --build server
+GORAG_EVALUATION_ENDPOINT=http://localhost:8080/api/v1/questions \
+  GORAG_EVALUATION_EXCLUDE_SCENARIOS=deleted_document \
+  go test -timeout 35m -count=1 -run '^TestLiveEvaluation$' -v . > /tmp/gorag-baseline.log 2>&1
+
+# 对照：启用重排，其他配置不变。
+GORAG_RERANK_ENABLED=true docker compose up -d server
+GORAG_EVALUATION_ENDPOINT=http://localhost:8080/api/v1/questions \
+  GORAG_EVALUATION_EXCLUDE_SCENARIOS=deleted_document \
+  go test -timeout 35m -count=1 -run '^TestLiveEvaluation$' -v . > /tmp/gorag-rerank.log 2>&1
+
+docker compose logs server | grep 'rerank completed'
+```
+
+每次切换后先确认 `/readyz` 成功，再运行对应测试。Live evaluator 单次 HTTP 超时为 2 分钟（容纳默认 30 秒重排、60 秒回答及检索开销），整轮上限 30 分钟，示例用 `-timeout 35m` 覆盖 Go 测试默认的 10 分钟进程超时；调高模型超时时需同步调整评测预算。评测不通过时查看日志文件中的逐题报告。
+
+比较来源/章节命中、关键词覆盖、回答与拒答正确率，并检查各题回归；通过日志确认成功执行比例、超时/格式失败率和重排耗时。需要端到端延迟时，对同一问题重复用 `curl -o /dev/null -s -w '%{time_total}\n' -H 'Content-Type: application/json' -d '{"question":"知识库中的事务边界是什么？"}' http://localhost:8080/api/v1/questions` 测量。对模型冷启动/预热分别记录，多轮运行而非只比较一次。现有评测衡量最终问答，不是独立的排序 nDCG/MRR 基准。
+
+默认测试使用 fake 模型及本地 HTTP stub，不依赖真实重排服务。它们验证工程契约，**不能证明你的模型会改善回答质量**；真实服务配置和效果评测需由部署者完成。
 
 ## 停止、数据卷与排障
 

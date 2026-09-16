@@ -67,8 +67,9 @@ func NewContextBuilder(maxContext int) (*ContextBuilder, error) {
 	return &ContextBuilder{MaxContext: maxContext}, nil
 }
 
-// Build deterministically ranks documents, assigns S1..Sn, and creates prompt
-// text plus a reverse mapping to the exact retrieval results.
+// Build honors validated request-local rerank positions when present, otherwise
+// uses the original deterministic score ordering. It assigns S1..Sn only after
+// final selection and maps citations to the unmodified source content.
 func (b *ContextBuilder) Build(ctx context.Context, documents []*schema.Document) (BuiltContext, error) {
 	if err := ctx.Err(); err != nil {
 		return BuiltContext{}, err
@@ -86,7 +87,28 @@ func (b *ContextBuilder) Build(ctx context.Context, documents []*schema.Document
 			return BuiltContext{}, fmt.Errorf("%w: document %q content is empty", ErrInvalidContext, document.ID)
 		}
 	}
+	// Rerank metadata is all-or-nothing. Parent deduplication can leave gaps,
+	// but mixed or duplicate ordinals indicate a broken internal contract.
+	positions := make(map[int]bool, len(ranked))
+	for _, document := range ranked {
+		if _, marked := document.MetaData[queryretriever.MetadataRerankPosition]; !marked {
+			continue
+		}
+		position, valid := queryretriever.RerankPosition(document)
+		if !valid || positions[position] {
+			return BuiltContext{}, fmt.Errorf("%w: invalid rerank positions", ErrInvalidContext)
+		}
+		positions[position] = true
+	}
+	if len(positions) > 0 && len(positions) != len(ranked) {
+		return BuiltContext{}, fmt.Errorf("%w: partial rerank positions", ErrInvalidContext)
+	}
 	sort.SliceStable(ranked, func(i, j int) bool {
+		if len(positions) > 0 {
+			left, _ := queryretriever.RerankPosition(ranked[i])
+			right, _ := queryretriever.RerankPosition(ranked[j])
+			return left < right
+		}
 		if ranked[i].Score() != ranked[j].Score() {
 			return ranked[i].Score() > ranked[j].Score()
 		}

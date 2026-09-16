@@ -44,6 +44,18 @@ answer:
   api_key: ""
   timeout: 60s
 
+# Optional query-only enhancement. No inheritance from answer settings.
+# Fill base_url/model and inject the API key before enabling.
+rerank:
+  enabled: false
+  provider: "openai-compatible"
+  base_url: ""
+  model: ""
+  api_key: ""
+  timeout: 30s
+  max_input_chars: 24000
+  max_concurrency: 1
+
 startup:
   check_timeout: 30s
   retry_interval: 1s
