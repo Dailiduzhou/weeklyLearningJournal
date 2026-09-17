@@ -87,7 +87,7 @@ func run(ctx context.Context, args []string, logger *slog.Logger, stderr io.Writ
 	}
 	defer store.Close()
 
-	usecaseOptions := make([]indexerusecase.Option, 0, 1)
+	usecaseOptions := []indexerusecase.Option{indexerusecase.WithLogger(logger)}
 	if cfg.Retrieval.BM25.Enabled {
 		bm25Index, err := bm25.Open(cfg.Retrieval.BM25.IndexPath)
 		if err != nil {

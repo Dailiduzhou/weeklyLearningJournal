@@ -9,6 +9,8 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"path"
 	"strconv"
 	"strings"
@@ -93,11 +95,26 @@ type Indexer struct {
 	embedder  Embedder
 	store     Store
 	chunkSink ChunkSink
+	logger    *slog.Logger
 	version   func() (string, error)
 	versionMu sync.Mutex
 }
 
 type Option func(*Indexer)
+
+// WithLogger enables structured progress logging. A nil logger is ignored;
+// logging is disabled by default.
+func WithLogger(logger *slog.Logger) Option {
+	return func(indexer *Indexer) {
+		if logger != nil {
+			indexer.logger = logger
+		}
+	}
+}
+
+func (i *Indexer) runLogger(result *Result) *slog.Logger {
+	return i.logger.With("operation", result.Operation, "run_id", result.RunID)
+}
 
 // WithVersionGenerator makes version allocation deterministic in tests.
 func WithVersionGenerator(generator func() (string, error)) Option {
@@ -147,6 +164,7 @@ func New(config Config, loader Loader, splitter Splitter, embedder Embedder, sto
 	indexer := &Indexer{
 		config: config, loader: loader, splitter: splitter, embedder: embedder,
 		store: store, version: newVersion,
+		logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	}
 	for _, option := range options {
 		option(indexer)
@@ -162,6 +180,7 @@ func (i *Indexer) Sync(ctx context.Context) (Result, error) {
 		if err != nil {
 			return fmt.Errorf("scan docs root: %w", err)
 		}
+		i.runLogger(result).InfoContext(ctx, "document scan completed", "documents", len(documents))
 		stored, err := i.store.ListDocuments(ctx)
 		if err != nil {
 			return fmt.Errorf("list stored documents: %w", err)
@@ -219,6 +238,7 @@ func (i *Indexer) ReindexAll(ctx context.Context) (Result, error) {
 		if err != nil {
 			return fmt.Errorf("scan docs root: %w", err)
 		}
+		i.runLogger(result).InfoContext(ctx, "document scan completed", "documents", len(documents))
 		failures := i.indexDocuments(ctx, documents, true, "reindex", result)
 		if err := ctx.Err(); err != nil {
 			failures = append(failures, err)
@@ -273,7 +293,7 @@ func (i *Indexer) fileRun(ctx context.Context, runType, target string, force boo
 			result.FailurePaths = []string{sourcePath}
 			return fmt.Errorf("load %q: %w", sourcePath, err)
 		}
-		outcome, chunks, err := i.indexDocument(ctx, doc, force)
+		outcome, chunks, err := i.indexDocument(ctx, doc, force, i.runLogger(result))
 		result.Chunks = chunks
 		if err != nil {
 			result.Failed = 1
@@ -332,7 +352,7 @@ func (i *Indexer) indexDocuments(ctx context.Context, documents []document.Docum
 				if ctx.Err() != nil {
 					return
 				}
-				value, chunks, err := i.indexDocument(ctx, documents[index], force)
+				value, chunks, err := i.indexDocument(ctx, documents[index], force, i.runLogger(result))
 				results[index] = documentIndexResult{attempted: true, outcome: value, chunks: chunks, err: err}
 			}
 		}()
@@ -367,7 +387,25 @@ dispatch:
 	return failures
 }
 
-func (i *Indexer) indexDocument(ctx context.Context, doc document.Document, force bool) (outcome, int, error) {
+func (i *Indexer) indexDocument(ctx context.Context, doc document.Document, force bool, logger *slog.Logger) (value outcome, chunkCount int, indexErr error) {
+	started := time.Now()
+	logger = logger.With("source_path", doc.SourcePath)
+	logger.InfoContext(ctx, "document indexing started", "force", force)
+	defer func() {
+		if indexErr != nil {
+			logger.ErrorContext(ctx, "document indexing failed", "chunks", chunkCount, "duration", time.Since(started), "error", indexErr)
+			return
+		}
+		status := "skipped"
+		switch value {
+		case outcomeAdded:
+			status = "added"
+		case outcomeUpdated:
+			status = "updated"
+		}
+		logger.InfoContext(ctx, "document indexing completed", "status", status, "chunks", chunkCount, "duration", time.Since(started))
+	}()
+
 	if err := ctx.Err(); err != nil {
 		return outcomeSkipped, 0, err
 	}
@@ -407,10 +445,14 @@ func (i *Indexer) indexDocument(ctx context.Context, doc document.Document, forc
 		return outcomeSkipped, 0, errors.New("split document: no chunks produced")
 	}
 
+	logger = logger.With("document_id", record.ID, "version", version)
+	logger.InfoContext(ctx, "document split completed", "chunks", len(chunks))
 	inputs := make([]embedding.DocumentInput, len(chunks))
 	for index, chunk := range chunks {
 		inputs[index] = embedding.DocumentInput{SourcePath: doc.SourcePath, ChunkIndex: chunk.Index, Text: chunk.Content}
 	}
+	embeddingStarted := time.Now()
+	logger.InfoContext(ctx, "document embedding started", "chunks", len(chunks), "model", i.embedder.Model())
 	vectors, err := i.embedder.EmbedDocuments(ctx, inputs)
 	if err != nil {
 		return outcomeSkipped, 0, fmt.Errorf("embed document: %w", err)
@@ -433,6 +475,8 @@ func (i *Indexer) indexDocument(ctx context.Context, doc document.Document, forc
 		chunks[index].EmbeddingDimension = i.embedder.Dimension()
 		storedChunks[index] = repository.VersionChunk{Chunk: chunks[index], Embedding: vectors[index]}
 	}
+	logger.InfoContext(ctx, "document embedding completed", "chunks", len(chunks), "duration", time.Since(embeddingStarted))
+	logger.InfoContext(ctx, "document storage started", "chunks", len(storedChunks))
 	parent, err := parentDocument(cleaned)
 	if err != nil {
 		return outcomeSkipped, 0, err
@@ -451,6 +495,7 @@ func (i *Indexer) indexDocument(ctx context.Context, doc document.Document, forc
 		return outcomeSkipped, len(storedChunks), fmt.Errorf("clean inactive versions: %w", err)
 	}
 	if i.chunkSink != nil {
+		logger.InfoContext(ctx, "document chunk sink indexing started", "chunks", len(chunks))
 		if err := i.chunkSink.IndexChunks(ctx, strconv.FormatInt(record.ID, 10), version, chunks, metadata); err != nil {
 			return outcomeSkipped, len(storedChunks), fmt.Errorf("mirror chunk version %q into chunk sink: %w", version, err)
 		}
@@ -494,8 +539,23 @@ func parentDocument(cleaned cleaner.Result) (repository.ActivationParent, error)
 	}, nil
 }
 
-func (i *Indexer) withRun(ctx context.Context, runType string, work func(context.Context, *Result) error) (Result, error) {
-	result := Result{Operation: runType}
+func (i *Indexer) withRun(ctx context.Context, runType string, work func(context.Context, *Result) error) (result Result, runErr error) {
+	started := time.Now()
+	result = Result{Operation: runType}
+	i.logger.InfoContext(ctx, "index run starting", "operation", runType, "docs_root", i.config.DocsRoot, "document_concurrency", i.config.DocumentConcurrency)
+	defer func() {
+		attributes := []any{
+			"documents", result.Documents, "chunks", result.Chunks,
+			"added", result.Added, "updated", result.Updated, "deleted", result.Deleted,
+			"skipped", result.Skipped, "failed", result.Failed, "duration", time.Since(started),
+		}
+		if runErr != nil {
+			attributes = append(attributes, "failure_paths", result.FailurePaths, "error", runErr)
+			i.runLogger(&result).ErrorContext(ctx, "index run failed", attributes...)
+			return
+		}
+		i.runLogger(&result).InfoContext(ctx, "index run completed", attributes...)
+	}()
 	if err := ctx.Err(); err != nil {
 		return result, err
 	}
@@ -504,6 +564,7 @@ func (i *Indexer) withRun(ctx context.Context, runType string, work func(context
 		return result, fmt.Errorf("start %s index run: %w", runType, err)
 	}
 	result.RunID = run.ID
+	i.runLogger(&result).InfoContext(ctx, "index run started")
 
 	workErr := work(ctx, &result)
 	if workErr == nil {
